@@ -1,0 +1,110 @@
+# 定义工作流的名称
+name: CI
+
+on:
+  workflow_dispatch: # 允许手动触发工作流
+  push: # 当有代码推送事件发生时
+    branches:
+      - main # 只有推送到 main 分支时才触发
+    tags:
+    - '*'
+  pull_request:
+
+
+# 定义工作流的任务
+jobs:
+  build:
+    # 定义运行此任务的环境：最新版本的 ubuntu
+    runs-on: ubuntu-latest
+
+    # 定义任务中的步骤
+    steps:
+      # 检出代码。只检出最新的1次提交
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      # 设置 QEMU 模拟器，这通常用于多平台的 Docker 构建
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      # 设置 Docker Buildx，用于构建多平台的 Docker 镜像
+      - name: Set up Build
+        uses: docker/setup-buildx-action@v2
+      - run: |
+          make build
+ 
+  linting:
+    name: Lint Code Base
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          # Full git history is needed to get a proper list of changed files within `super-linter`
+          fetch-depth: 0
+      - name: Lint Code Base
+        uses: github/super-linter@v4
+        env:
+          VALIDATE_MARKDOWN: true
+          VALIDATE_ALL_CODEBASE: false
+          DEFAULT_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          LINTER_RULES_PATH: /
+          MARKDOWN_CONFIG_FILE: .markdownlint.yml
+
+  main:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'zncdata-labs/hive-metadata-operator'
+    runs-on: ubuntu-latest
+    needs:
+      - build
+      - linting
+
+    steps:
+      # 检出代码。只检出最新的1次提交
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      # 登录到 QUAY Hub
+      - name: Login to quay.io
+        uses: docker/login-action@v2
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }} # 使用存储在 GitHub Secrets 中的 QUAY 用户名
+          password: ${{ secrets.QUAY_PASSWORD }} # 使用存储在 GitHub Secrets 中的 QUAY 密码
+
+      - name: Build and push Docker image
+        run: |
+          make docker-buildx
+          make bundle
+          make bundle-buildx
+
+  tags:
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags') && github.repository == 'zncdata-labs/hive-metadata-operator'
+    runs-on: ubuntu-latest
+    needs:
+      - build
+      - linting
+
+    steps:
+      # 检出代码。只检出最新的1次提交
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+
+      # 登录到 QUAY Hub
+      - name: Login to quay.io
+        uses: docker/login-action@v2
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }} # 使用存储在 GitHub Secrets 中的 QUAY 用户名
+          password: ${{ secrets.QUAY_PASSWORD }} # 使用存储在 GitHub Secrets 中的 QUAY 密码
+
+      - name: Build and push Docker image
+        run: |
+          export VERSION=$GITHUB_REF_NAME
+          make docker-buildx
+          make bundle
+          make bundle-buildx
