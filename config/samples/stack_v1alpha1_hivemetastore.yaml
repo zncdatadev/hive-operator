@@ -9,4 +9,9 @@ metadata:
     app.kubernetes.io/created-by: hive-metadata-operator
   name: hivemetastore-sample
 spec:
-  # TODO(user): Add fields here
+  image:
+    repository: apache/hive
+    tag: 4.0.0-beta-1
+  postgres:
+    host: postgresql.default.svc
+    port: "5432"

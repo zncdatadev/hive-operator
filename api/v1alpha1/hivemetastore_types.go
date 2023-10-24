@@ -51,6 +51,9 @@ type HiveMetastoreSpec struct {
 
 	// +kubebuilder:validation:Optional
 	Persistence *PersistenceSpec `json:"persistence,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	PostgresSecret map[string]string `json:"postgres,omitempty"`
 }
 
 // GetNameWithSuffix returns the name of the HiveMetastore with the provided suffix appended.
@@ -58,13 +61,17 @@ func (instance *HiveMetastore) GetNameWithSuffix(name string) string {
 	return instance.GetName() + "-" + name
 }
 
+// type SecretParam struct {
+// 	PostgresSecret map[string]string `json:"postgres,omitempty"`
+// }
+
 type ImageSpec struct {
 
 	// +kubebuilder:validation=Optional
 	// +kubebuilder:default=docker.io/apache/hive-metastore
 	Repository string `json:"repository,omitempty"`
 
-	// +kubebuilder:validation:Enum=latest;stable
+	// +kubebuilder:validation=Optional
 	// +kubebuilder:default=latest
 	Tag string `json:"tag,omitempty"`
 

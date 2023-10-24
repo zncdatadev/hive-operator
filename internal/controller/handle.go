@@ -2,66 +2,16 @@ package controller
 
 import (
 	"context"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	stackv1alpha1 "github.com/zncdata-labs/hive-metadata-operator/api/v1alpha1"
 )
-
-// make pvc
-func makePVC(ctx context.Context, instance *stackv1alpha1.HiveMetastore, schema *runtime.Scheme) *corev1.PersistentVolumeClaim {
-	logger := log.FromContext(ctx)
-	labels := instance.GetLabels()
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.GetPvcName(),
-			Namespace: instance.Namespace,
-			Labels:    labels,
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			StorageClassName: instance.Spec.Persistence.StorageClass,
-			AccessModes:      instance.Spec.Persistence.AccessModes,
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse(instance.Spec.Persistence.Size),
-				},
-			},
-			VolumeMode: instance.Spec.Persistence.VolumeMode,
-		},
-	}
-	err := ctrl.SetControllerReference(instance, pvc, schema)
-	if err != nil {
-		logger.Error(err, "Failed to set controller reference")
-		return nil
-	}
-	return pvc
-}
-
-// reconcilePVC
-func (r *HiveMetastoreReconciler) reconcilePVC(ctx context.Context, instance *stackv1alpha1.HiveMetastore) error {
-	logger := log.FromContext(ctx)
-	pvc := &corev1.PersistentVolumeClaim{}
-	err := r.Client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: instance.GetPvcName()}, pvc)
-	if err != nil && errors.IsNotFound(err) {
-		pvc := makePVC(ctx, instance, r.Scheme)
-		logger.Info("Creating a new PVC", "PVC.Namespace", pvc.Namespace, "PVC.Name", pvc.Name)
-		err := r.Client.Create(ctx, pvc)
-		if err != nil {
-			return err
-		}
-	} else if err != nil {
-		logger.Error(err, "Failed to get PVC")
-		return err
-	}
-	return nil
-}
 
 // make service
 func makeService(ctx context.Context, instance *stackv1alpha1.HiveMetastore, schema *runtime.Scheme) *corev1.Service {
@@ -108,6 +58,43 @@ func (r *HiveMetastoreReconciler) reconcileService(ctx context.Context, instance
 
 func makeDeployment(ctx context.Context, instance *stackv1alpha1.HiveMetastore, schema *runtime.Scheme) *appsv1.Deployment {
 	labels := instance.GetLabels()
+	secretVarNames := []string{"POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB", "POSTGRES_HOST", "POSTGRES_PORT"}
+	envVars := []corev1.EnvVar{}
+
+	for _, secretVarName := range secretVarNames {
+		envVar := corev1.EnvVar{
+			Name: secretVarName,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key: secretVarName,
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "hive-postgres",
+					},
+				},
+			},
+		}
+		envVars = append(envVars, envVar)
+	}
+	envVars = append(envVars,
+		corev1.EnvVar{
+			Name:  "POSTGRES_HOST",
+			Value: instance.Spec.PostgresSecret["host"],
+		},
+		corev1.EnvVar{
+			Name:  "POSTGRES_PORT",
+			Value: instance.Spec.PostgresSecret["port"],
+		},
+		corev1.EnvVar{
+			Name:  "SERVICE_NAME",
+			Value: "metastore",
+		},
+		corev1.EnvVar{
+			Name: "SERVICE_OPTS",
+			Value: `-Xmx1G -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver
+			-Djavax.jdo.option.ConnectionURL=jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+			-Djavax.jdo.option.ConnectionUserName=${POSTGRES_USER}
+			-Djavax.jdo.option.ConnectionPassword=${POSTGRES_PASSWORD}`,
+		})
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.Name,
@@ -129,9 +116,7 @@ func makeDeployment(ctx context.Context, instance *stackv1alpha1.HiveMetastore, 
 							Name:            instance.Name,
 							Image:           instance.Spec.Image.Repository + ":" + instance.Spec.Image.Tag,
 							ImagePullPolicy: instance.Spec.Image.PullPolicy,
-							Args: []string{
-								"/opt/bitnami/spark/sbin/start-history-server.sh",
-							},
+							Env:             envVars,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 18080,
@@ -139,25 +124,25 @@ func makeDeployment(ctx context.Context, instance *stackv1alpha1.HiveMetastore, 
 									Protocol:      "TCP",
 								},
 							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      instance.GetNameWithSuffix("-data"),
-									MountPath: "/tmp/spark-events",
-								},
-							},
+							// VolumeMounts: []corev1.VolumeMount{
+							// 	{
+							// 		Name:      instance.GetNameWithSuffix("-data"),
+							// 		MountPath: "/tmp/spark-events",
+							// 	},
+							// },
 						},
 					},
 					Tolerations: instance.Spec.Tolerations,
-					Volumes: []corev1.Volume{
-						{
-							Name: instance.GetNameWithSuffix("-data"),
-							VolumeSource: corev1.VolumeSource{
-								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: instance.GetPvcName(),
-								},
-							},
-						},
-					},
+					// Volumes: []corev1.Volume{
+					// 	{
+					// 		Name: instance.GetNameWithSuffix("-data"),
+					// 		VolumeSource: corev1.VolumeSource{
+					// 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					// 				ClaimName: instance.GetPvcName(),
+					// 			},
+					// 		},
+					// 	},
+					// },
 				},
 			},
 		},

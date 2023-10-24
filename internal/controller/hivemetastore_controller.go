@@ -94,10 +94,10 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	if err := r.reconcilePVC(ctx, sparkHistory); err != nil {
-		logger.Error(err, "unable to reconcile PVC")
-		return ctrl.Result{}, err
-	}
+	// if err := r.reconcilePVC(ctx, sparkHistory); err != nil {
+	// 	logger.Error(err, "unable to reconcile PVC")
+	// 	return ctrl.Result{}, err
+	// }
 
 	if err := r.reconcileDeployment(ctx, sparkHistory); err != nil {
 		logger.Error(err, "unable to reconcile Deployment")
