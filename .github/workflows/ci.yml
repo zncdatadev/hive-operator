@@ -55,7 +55,7 @@ jobs:
           MARKDOWN_CONFIG_FILE: .markdownlint.yml
 
   main:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'zncdata-labs/hive-metadata-operator'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'zncdata-labs/hive-metastore-operator'
     runs-on: ubuntu-latest
     needs:
       - build
@@ -82,7 +82,7 @@ jobs:
           make bundle-buildx
 
   tags:
-    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags') && github.repository == 'zncdata-labs/hive-metadata-operator'
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags') && github.repository == 'zncdata-labs/hive-metastore-operator'
     runs-on: ubuntu-latest
     needs:
       - build
