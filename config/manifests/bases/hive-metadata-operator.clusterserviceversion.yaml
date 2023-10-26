@@ -4,7 +4,7 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Basic Install
-  name: hive-metadata-operator.v0.0.0
+  name: hive-metastore-operator.v0.0.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -37,8 +37,8 @@ spec:
   - hive
   - metastore
   links:
-  - name: Hive Metadata Operator
-    url: https://hive-metadata-operator.domain
+  - name: Hive Metastore Operator
+    url: https://hive-metastore-operator.domain
   maturity: alpha
   provider:
     name: zncdata-labs
