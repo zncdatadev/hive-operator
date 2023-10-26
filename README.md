@@ -1,14 +1,18 @@
 # hive-metastore-operator
+
 // TODO(user): Add simple overview of use/purpose
 
 ## Description
+
 // TODO(user): An in-depth paragraph about your project and overview of use
 
 ## Getting Started
+
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
 **Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
 
 ### Running on the cluster
+<!-- markdownlint-disable -->
 1. Install Instances of Custom Resources:
 
 ```sh
@@ -26,8 +30,10 @@ make docker-build docker-push IMG=<some-registry>/hive-metastore-operator:tag
 ```sh
 make deploy IMG=<some-registry>/hive-metastore-operator:tag
 ```
+<!-- markdownlint-restore -->
 
 ### Uninstall CRDs
+
 To delete the CRDs from the cluster:
 
 ```sh
@@ -35,6 +41,7 @@ make uninstall
 ```
 
 ### Undeploy controller
+
 UnDeploy the controller from the cluster:
 
 ```sh
@@ -42,15 +49,19 @@ make undeploy
 ```
 
 ## Contributing
+
 // TODO(user): Add detailed information on how you would like others to contribute to this project
 
 ### How it works
+
 This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
 
 It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/),
 which provide a reconcile function responsible for synchronizing resources until the desired state is reached on the cluster.
 
 ### Test It Out
+<!-- markdownlint-disable -->
+
 1. Install the CRDs into the cluster:
 
 ```sh
@@ -62,10 +73,12 @@ make install
 ```sh
 make run
 ```
+<!-- markdownlint-restore -->
 
 **NOTE:** You can also run this in one step by running: `make install run`
 
 ### Modifying the API definitions
+
 If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
 
 ```sh
