@@ -109,6 +109,11 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
+	if err := r.reconcileSecret(ctx, sparkHistory); err != nil {
+		logger.Error(err, "unable to reconcile Secret")
+		return ctrl.Result{}, err
+	}
+
 	podList := &corev1.PodList{}
 	if err := r.List(ctx, podList, &client.ListOptions{Namespace: sparkHistory.Namespace, LabelSelector: labels.SelectorFromSet(sparkHistory.GetLabels())}); err != nil {
 		logger.Error(err, "unable to list pods")

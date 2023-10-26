@@ -32,10 +32,11 @@ type HiveMetastoreSpec struct {
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas,omitempty"`
 
-	Resource *corev1.ResourceRequirements `json:"resource,omitempty"`
+	// +kubebuilder:validation:Required
+	Resources *corev1.ResourceRequirements `json:"resources"`
 
-	// +kubebuilder:validation:Optional
-	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+	// +kubebuilder:validation:Required
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
 
 	// +kubebuilder:validation:Optional
 	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
@@ -53,7 +54,7 @@ type HiveMetastoreSpec struct {
 	Persistence *PersistenceSpec `json:"persistence,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	PostgresSecret map[string]string `json:"postgres,omitempty"`
+	PostgresSecret *PostgresSecretSpec `json:"postgres,omitempty"`
 }
 
 // GetNameWithSuffix returns the name of the HiveMetastore with the provided suffix appended.
@@ -61,9 +62,23 @@ func (instance *HiveMetastore) GetNameWithSuffix(name string) string {
 	return instance.GetName() + "-" + name
 }
 
-// type SecretParam struct {
-// 	PostgresSecret map[string]string `json:"postgres,omitempty"`
-// }
+type PostgresSecretSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="postgresql"
+	Host string `json:"host,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="5432"
+	Port string `json:"port"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="hive"
+	UserName string `json:"username"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="12345678"
+	Password string `json:"password"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="hive"
+	DataBase string `json:"database"`
+}
 
 type ImageSpec struct {
 

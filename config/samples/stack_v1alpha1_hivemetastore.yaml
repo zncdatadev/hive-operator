@@ -9,9 +9,24 @@ metadata:
     app.kubernetes.io/created-by: hive-metadata-operator
   name: hivemetastore-sample
 spec:
+  replicas: 1
+  service:
+    port: 18080
+    type: ClusterIP
   image:
-    repository: apache/hive
+    repository: quay.io/plutoso/hive
     tag: 4.0.0-beta-1
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
   postgres:
     host: postgresql.default.svc
     port: "5432"
+    username: hive
+    password: "12345678"
+    database: metastore
+  securityContext:
+    runAsUser: 1000
+    fsGroup: 1000
