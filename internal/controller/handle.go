@@ -10,7 +10,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	stackv1alpha1 "github.com/zncdata-labs/hive-metadata-operator/api/v1alpha1"
+	stackv1alpha1 "github.com/zncdata-labs/hive-metastore-operator/api/v1alpha1"
 )
 
 // make service
