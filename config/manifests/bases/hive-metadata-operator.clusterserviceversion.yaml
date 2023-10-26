@@ -1,0 +1,46 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: hive-metadata-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: HiveMetastore is the Schema for the hivemetastores API
+      displayName: Hive Metastore
+      kind: HiveMetastore
+      name: hivemetastores.stack.zncdata.net
+      version: v1alpha1
+  description: hive metastore for operator
+  displayName: hive-metastore-operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: false
+    type: AllNamespaces
+  keywords:
+  - hive
+  - metastore
+  links:
+  - name: Hive Metadata Operator
+    url: https://hive-metadata-operator.domain
+  maturity: alpha
+  provider:
+    name: zncdata-labs
+    url: https://github.com/zncdata-labs
+  version: 0.0.0
