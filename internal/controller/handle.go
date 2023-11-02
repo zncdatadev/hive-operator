@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,7 +13,7 @@ import (
 )
 
 // make service
-func makeService(ctx context.Context, instance *stackv1alpha1.HiveMetastore, schema *runtime.Scheme) *corev1.Service {
+func (r *HiveMetastoreReconciler) makeService(instance *stackv1alpha1.HiveMetastore, schema *runtime.Scheme) *corev1.Service {
 	labels := instance.GetLabels()
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -37,6 +36,7 @@ func makeService(ctx context.Context, instance *stackv1alpha1.HiveMetastore, sch
 	}
 	err := ctrl.SetControllerReference(instance, svc, schema)
 	if err != nil {
+		r.Log.Error(err, "Failed to set controller reference for service")
 		return nil
 	}
 	return svc
@@ -44,7 +44,7 @@ func makeService(ctx context.Context, instance *stackv1alpha1.HiveMetastore, sch
 
 func (r *HiveMetastoreReconciler) reconcileService(ctx context.Context, instance *stackv1alpha1.HiveMetastore) error {
 	logger := log.FromContext(ctx)
-	obj := makeService(ctx, instance, r.Scheme)
+	obj := r.makeService(instance, r.Scheme)
 	if obj == nil {
 		return nil
 	}
@@ -56,7 +56,7 @@ func (r *HiveMetastoreReconciler) reconcileService(ctx context.Context, instance
 	return nil
 }
 
-func makeDeployment(ctx context.Context, instance *stackv1alpha1.HiveMetastore, schema *runtime.Scheme) *appsv1.Deployment {
+func (r *HiveMetastoreReconciler) makeDeployment(instance *stackv1alpha1.HiveMetastore, schema *runtime.Scheme) *appsv1.Deployment {
 	labels := instance.GetLabels()
 	secretVarNames := []string{"POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB", "POSTGRES_HOST", "POSTGRES_PORT"}
 	var envVars []corev1.EnvVar
@@ -67,7 +67,7 @@ func makeDeployment(ctx context.Context, instance *stackv1alpha1.HiveMetastore, 
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key: secretVarName,
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: instance.GetNameWithSuffix("-secret"),
+						Name: instance.GetNameWithSuffix("secret"),
 					},
 				},
 			},
@@ -130,19 +130,35 @@ func makeDeployment(ctx context.Context, instance *stackv1alpha1.HiveMetastore, 
 	}
 	err := ctrl.SetControllerReference(instance, dep, schema)
 	if err != nil {
+		r.Log.Error(err, "Failed to set controller reference for deployment")
 		return nil
 	}
 	return dep
 }
 
+func (r *HiveMetastoreReconciler) updateStatusConditionWithDeployment(ctx context.Context, instance *stackv1alpha1.HiveMetastore, status metav1.ConditionStatus, message string) error {
+	instance.SetStatusCondition(metav1.Condition{
+		Type:               stackv1alpha1.ConditionTypeProgressing,
+		Status:             status,
+		Reason:             stackv1alpha1.ConditionReasonReconcileDeployment,
+		Message:            message,
+		ObservedGeneration: instance.GetGeneration(),
+		LastTransitionTime: metav1.Now(),
+	})
+
+	if err := r.UpdateStatus(ctx, instance); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (r *HiveMetastoreReconciler) reconcileDeployment(ctx context.Context, instance *stackv1alpha1.HiveMetastore) error {
-	logger := log.FromContext(ctx)
-	obj := makeDeployment(ctx, instance, r.Scheme)
+	obj := r.makeDeployment(instance, r.Scheme)
 	if obj == nil {
 		return nil
 	}
 	if err := CreateOrUpdate(ctx, r.Client, obj); err != nil {
-		logger.Error(err, "Failed to create or update deployment")
+		r.Log.Error(err, "Failed to create or update deployment")
 		return err
 	}
 	return nil
@@ -171,7 +187,6 @@ func makeSecret(ctx context.Context, instance *stackv1alpha1.HiveMetastore, sche
 }
 
 func (r *HiveMetastoreReconciler) reconcileSecret(ctx context.Context, instance *stackv1alpha1.HiveMetastore) error {
-	logger := log.FromContext(ctx)
 	objs := makeSecret(ctx, instance, r.Scheme)
 
 	if objs == nil {
@@ -179,7 +194,7 @@ func (r *HiveMetastoreReconciler) reconcileSecret(ctx context.Context, instance 
 	}
 	for _, obj := range objs {
 		if err := CreateOrUpdate(ctx, r.Client, obj); err != nil {
-			logger.Error(err, "Failed to create or update secret")
+			r.Log.Error(err, "Failed to create or update secret")
 			return err
 		}
 	}
