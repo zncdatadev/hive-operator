@@ -37,8 +37,9 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme        = runtime.NewScheme()
+	setupLog      = ctrl.Log.WithName("setup")
+	reconcrileLog = ctrl.Log.WithName("reconciler")
 )
 
 func init() {
@@ -90,6 +91,7 @@ func main() {
 	if err = (&controller.HiveMetastoreReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Log:    reconcrileLog,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HiveMetastore")
 		os.Exit(1)

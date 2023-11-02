@@ -18,22 +18,19 @@ package controller
 
 import (
 	"context"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"reflect"
-
+	"github.com/go-logr/logr"
+	stackv1alpha1 "github.com/zncdata-labs/hive-metastore-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	stackv1alpha1 "github.com/zncdata-labs/hive-metastore-operator/api/v1alpha1"
 )
 
 // HiveMetastoreReconciler reconciles a HiveMetastore object
 type HiveMetastoreReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Log    logr.Logger
 }
 
 //+kubebuilder:rbac:groups=stack.zncdata.net,resources=hivemetastores,verbs=get;list;watch;create;update;patch;delete
@@ -57,91 +54,85 @@ type HiveMetastoreReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+	r.Log.Info("Reconciling instance")
 
-	logger.Info("Reconciling instance")
+	hiveMetastore := &stackv1alpha1.HiveMetastore{}
 
-	sparkHistory := &stackv1alpha1.HiveMetastore{}
-	if err := r.Get(ctx, req.NamespacedName, sparkHistory); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, hiveMetastore); err != nil {
 		if client.IgnoreNotFound(err) != nil {
-			logger.Error(err, "unable to fetch instance")
+			r.Log.Error(err, "unable to fetch instance")
 			return ctrl.Result{}, err
 		}
-		logger.Info("Instance deleted")
+		r.Log.Info("HiveMetastore resource not found. Ignoring since object must be deleted")
 		return ctrl.Result{}, nil
 	}
 
-	logger.Info("Instance found", "Name", sparkHistory.Name)
+	//// Get the status condition, if it exists and its generation is not the
+	////same as the HiveMetastore's generation, reset the status conditions
+	//readCondition := apimeta.FindStatusCondition(hiveMetastore.Status.Conditions, stackv1alpha1.ConditionTypeProgressing)
+	//if readCondition == nil || readCondition.ObservedGeneration != hiveMetastore.GetGeneration() {
+	//	hiveMetastore.InitStatusConditions()
+	//
+	//	if err := r.UpdateStatus(ctx, hiveMetastore); err != nil {
+	//		return ctrl.Result{}, err
+	//	}
+	//}
+	//
+	//r.Log.Info("HiveMetastore found", "Name", hiveMetastore.Name)
 
-	if len(sparkHistory.Status.Conditions) == 0 {
-		sparkHistory.Status.Nodes = []string{}
-		sparkHistory.Status.Conditions = append(sparkHistory.Status.Conditions, corev1.ComponentCondition{
-			Type:   corev1.ComponentHealthy,
-			Status: corev1.ConditionFalse,
-		})
-		err := r.Status().Update(ctx, sparkHistory)
-		if err != nil {
-			logger.Error(err, "unable to update status")
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{Requeue: true}, nil
-	} else if sparkHistory.Status.Conditions[0].Status == corev1.ConditionTrue {
-		sparkHistory.Status.Conditions[0].Status = corev1.ConditionFalse
-		err := r.Status().Update(ctx, sparkHistory)
-		if err != nil {
-			logger.Error(err, "unable to update status")
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{Requeue: true}, nil
-	}
-
-	// if err := r.reconcilePVC(ctx, sparkHistory); err != nil {
-	// 	logger.Error(err, "unable to reconcile PVC")
-	// 	return ctrl.Result{}, err
-	// }
-
-	if err := r.reconcileDeployment(ctx, sparkHistory); err != nil {
-		logger.Error(err, "unable to reconcile Deployment")
+	if err := r.reconcileDeployment(ctx, hiveMetastore); err != nil {
+		r.Log.Error(err, "unable to reconcile Deployment")
 		return ctrl.Result{}, err
 	}
 
-	if err := r.reconcileService(ctx, sparkHistory); err != nil {
-		logger.Error(err, "unable to reconcile Service")
+	if err := r.reconcileService(ctx, hiveMetastore); err != nil {
+		r.Log.Error(err, "unable to reconcile Service")
 		return ctrl.Result{}, err
 	}
 
-	if err := r.reconcileSecret(ctx, sparkHistory); err != nil {
-		logger.Error(err, "unable to reconcile Secret")
+	if err := r.reconcileSecret(ctx, hiveMetastore); err != nil {
+		r.Log.Error(err, "unable to reconcile Secret")
 		return ctrl.Result{}, err
 	}
 
-	podList := &corev1.PodList{}
-	if err := r.List(ctx, podList, &client.ListOptions{Namespace: sparkHistory.Namespace, LabelSelector: labels.SelectorFromSet(sparkHistory.GetLabels())}); err != nil {
-		logger.Error(err, "unable to list pods")
-		return ctrl.Result{}, err
-	}
+	//hiveMetastore.SetStatusCondition(metav1.Condition{
+	//	Type:               stackv1alpha1.ConditionTypeAvailable,
+	//	Status:             metav1.ConditionTrue,
+	//	Reason:             stackv1alpha1.ConditionReasonRunning,
+	//	Message:            "HiveMetastore is running",
+	//	ObservedGeneration: hiveMetastore.GetGeneration(),
+	//})
 
-	podNames := getPodNames(podList.Items)
+	//if err := r.UpdateStatus(ctx, hiveMetastore); err != nil {
+	//	return ctrl.Result{}, err
+	//}
 
-	if !reflect.DeepEqual(podNames, sparkHistory.Status.Nodes) {
-		logger.Info("Updating status", "nodes", podNames)
-		sparkHistory.Status.Nodes = podNames
-		sparkHistory.Status.Conditions[0].Status = corev1.ConditionTrue
-		err := r.Status().Update(ctx, sparkHistory)
-		if err != nil {
-			logger.Error(err, "unable to update status")
-			return ctrl.Result{}, err
-		}
-	}
-
+	r.Log.Info("Successfully reconciled hiveMetastore")
 	return ctrl.Result{}, nil
 }
-func getPodNames(pods []corev1.Pod) []string {
-	var podNames []string
-	for _, pod := range pods {
-		podNames = append(podNames, pod.Name)
+
+func (r *HiveMetastoreReconciler) UpdateStatus(ctx context.Context, instance *stackv1alpha1.HiveMetastore) error {
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return r.Status().Update(ctx, instance)
+		//return r.Status().Patch(ctx, instance, client.MergeFrom(instance))
+	})
+
+	if retryErr != nil {
+		r.Log.Error(retryErr, "Failed to update vfm status after retries")
+		return retryErr
 	}
-	return podNames
+
+	//if err := r.Get(ctx, key, latest); err != nil {
+	//	r.Log.Error(err, "Failed to get latest object")
+	//	return err
+	//}
+
+	//if err := r.Status().Patch(ctx, instance, client.MergeFrom(instance)); err != nil {
+	//	r.Log.Error(err, "Failed to patch object status")
+	//	return err
+	//}
+	r.Log.V(1).Info("Successfully patched object status")
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

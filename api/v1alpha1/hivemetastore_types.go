@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -138,10 +139,50 @@ func (instance *HiveMetastore) GetPvcName() string {
 	return instance.GetNameWithSuffix("pvc")
 }
 
+// SetStatusCondition updates the status condition using the provided arguments.
+// If the condition already exists, it updates the condition; otherwise, it appends the condition.
+// If the condition status has changed, it updates the condition's LastTransitionTime.
+func (r *HiveMetastore) SetStatusCondition(condition metav1.Condition) {
+	// if the condition already exists, update it
+	existingCondition := apimeta.FindStatusCondition(r.Status.Conditions, condition.Type)
+	if existingCondition == nil {
+		condition.ObservedGeneration = r.GetGeneration()
+		condition.LastTransitionTime = metav1.Now()
+		r.Status.Conditions = append(r.Status.Conditions, condition)
+	} else if existingCondition.Status != condition.Status || existingCondition.Reason != condition.Reason || existingCondition.Message != condition.Message {
+		existingCondition.Status = condition.Status
+		existingCondition.Reason = condition.Reason
+		existingCondition.Message = condition.Message
+		existingCondition.ObservedGeneration = r.GetGeneration()
+		existingCondition.LastTransitionTime = metav1.Now()
+	}
+}
+
+// InitStatusConditions initializes the status conditions to the provided conditions.
+func (r *HiveMetastore) InitStatusConditions() {
+	r.Status.Conditions = []metav1.Condition{}
+	r.SetStatusCondition(metav1.Condition{
+		Type:               ConditionTypeProgressing,
+		Status:             metav1.ConditionTrue,
+		Reason:             ConditionReasonPreparing,
+		Message:            "HiveMetastore is preparing",
+		ObservedGeneration: r.GetGeneration(),
+		LastTransitionTime: metav1.Now(),
+	})
+	r.SetStatusCondition(metav1.Condition{
+		Type:               ConditionTypeAvailable,
+		Status:             metav1.ConditionFalse,
+		Reason:             ConditionReasonPreparing,
+		Message:            "HiveMetastore is preparing",
+		ObservedGeneration: r.GetGeneration(),
+		LastTransitionTime: metav1.Now(),
+	})
+}
+
 // HiveMetastoreStatus defines the observed state of HiveMetastore
 type HiveMetastoreStatus struct {
-	Nodes      []string                    `json:"nodes"`
-	Conditions []corev1.ComponentCondition `json:"conditions"`
+	// +kubebuilder:validation:Optional
+	Conditions []metav1.Condition `json:"condition,omitempty"`
 }
 
 //+kubebuilder:object:root=true
