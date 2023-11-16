@@ -175,7 +175,7 @@ func makeSecret(ctx context.Context, instance *stackv1alpha1.HiveMetastore, sche
 	data["POSTGRES_DB"] = []byte(instance.Spec.PostgresSecret.DataBase)
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.GetNameWithSuffix("-secret"),
+			Name:      instance.GetNameWithSuffix("secret"),
 			Namespace: instance.Namespace,
 			Labels:    labels,
 		},
@@ -198,7 +198,5 @@ func (r *HiveMetastoreReconciler) reconcileSecret(ctx context.Context, instance 
 			return err
 		}
 	}
-	// Create or update the secret
-
 	return nil
 }
