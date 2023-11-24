@@ -5,7 +5,7 @@ metadata:
     alm-examples: '[]'
     categories: Compute
     datasuit: Develop, Analysis
-    icon: https://spark.apache.org/favicon.ico
+    icon: https://hive.apache.org/favicon.ico
     capabilities: Basic Install
   name: hive-metastore-operator.v0.0.0
   namespace: placeholder
