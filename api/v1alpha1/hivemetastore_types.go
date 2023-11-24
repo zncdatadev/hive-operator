@@ -105,7 +105,7 @@ type ServiceSpec struct {
 
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:default=18080
+	// +kubebuilder:default=9083
 	Port int32 `json:"port,omitempty"`
 }
 

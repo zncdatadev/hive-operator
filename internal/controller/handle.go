@@ -117,10 +117,22 @@ func (r *HiveMetastoreReconciler) makeDeployment(instance *stackv1alpha1.HiveMet
 							Resources:       *instance.Spec.Resources,
 							Ports: []corev1.ContainerPort{
 								{
-									ContainerPort: 18080,
+									ContainerPort: 9083,
 									Name:          "http",
 									Protocol:      "TCP",
 								},
+							},
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name:            instance.GetNameWithSuffix("init"),
+							Image:           "quay.io/plutoso/alpine-tools:latest",
+							ImagePullPolicy: instance.Spec.Image.PullPolicy,
+							Args: []string{
+								"sh",
+								"-c",
+								"telnet" + " " + instance.Spec.PostgresSecret.Host + " " + instance.Spec.PostgresSecret.Port,
 							},
 						},
 					},
@@ -176,7 +188,7 @@ func makeSecret(ctx context.Context, instance *stackv1alpha1.HiveMetastore, sche
 	data["POSTGRES_DB"] = []byte(instance.Spec.PostgresSecret.DataBase)
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.GetNameWithSuffix("-secret"),
+			Name:      instance.GetNameWithSuffix("secret"),
 			Namespace: instance.Namespace,
 			Labels:    labels,
 		},
