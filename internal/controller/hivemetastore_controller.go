@@ -20,6 +20,8 @@ import (
 	"context"
 	"github.com/go-logr/logr"
 	stackv1alpha1 "github.com/zncdata-labs/hive-metastore-operator/api/v1alpha1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -69,16 +71,16 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	//// Get the status condition, if it exists and its generation is not the
 	////same as the HiveMetastore's generation, reset the status conditions
-	//readCondition := apimeta.FindStatusCondition(hiveMetastore.Status.Conditions, stackv1alpha1.ConditionTypeProgressing)
-	//if readCondition == nil || readCondition.ObservedGeneration != hiveMetastore.GetGeneration() {
-	//	hiveMetastore.InitStatusConditions()
-	//
-	//	if err := r.UpdateStatus(ctx, hiveMetastore); err != nil {
-	//		return ctrl.Result{}, err
-	//	}
-	//}
-	//
-	//r.Log.Info("HiveMetastore found", "Name", hiveMetastore.Name)
+	readCondition := apimeta.FindStatusCondition(hiveMetastore.Status.Conditions, stackv1alpha1.ConditionTypeProgressing)
+	if readCondition == nil || readCondition.ObservedGeneration != hiveMetastore.GetGeneration() {
+		hiveMetastore.InitStatusConditions()
+
+		if err := r.UpdateStatus(ctx, hiveMetastore); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	r.Log.Info("HiveMetastore found", "Name", hiveMetastore.Name)
 
 	if err := r.reconcileDeployment(ctx, hiveMetastore); err != nil {
 		r.Log.Error(err, "unable to reconcile Deployment")
@@ -95,17 +97,17 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	//hiveMetastore.SetStatusCondition(metav1.Condition{
-	//	Type:               stackv1alpha1.ConditionTypeAvailable,
-	//	Status:             metav1.ConditionTrue,
-	//	Reason:             stackv1alpha1.ConditionReasonRunning,
-	//	Message:            "HiveMetastore is running",
-	//	ObservedGeneration: hiveMetastore.GetGeneration(),
-	//})
+	hiveMetastore.SetStatusCondition(metav1.Condition{
+		Type:               stackv1alpha1.ConditionTypeAvailable,
+		Status:             metav1.ConditionTrue,
+		Reason:             stackv1alpha1.ConditionReasonRunning,
+		Message:            "HiveMetastore is running",
+		ObservedGeneration: hiveMetastore.GetGeneration(),
+	})
 
-	//if err := r.UpdateStatus(ctx, hiveMetastore); err != nil {
-	//	return ctrl.Result{}, err
-	//}
+	if err := r.UpdateStatus(ctx, hiveMetastore); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	r.Log.Info("Successfully reconciled hiveMetastore")
 	return ctrl.Result{}, nil
@@ -122,15 +124,6 @@ func (r *HiveMetastoreReconciler) UpdateStatus(ctx context.Context, instance *st
 		return retryErr
 	}
 
-	//if err := r.Get(ctx, key, latest); err != nil {
-	//	r.Log.Error(err, "Failed to get latest object")
-	//	return err
-	//}
-
-	//if err := r.Status().Patch(ctx, instance, client.MergeFrom(instance)); err != nil {
-	//	r.Log.Error(err, "Failed to patch object status")
-	//	return err
-	//}
 	r.Log.V(1).Info("Successfully patched object status")
 	return nil
 }

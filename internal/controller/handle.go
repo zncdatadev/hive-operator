@@ -136,11 +136,13 @@ func (r *HiveMetastoreReconciler) makeDeployment(instance *stackv1alpha1.HiveMet
 							},
 						},
 					},
-					Tolerations: instance.Spec.Tolerations,
 				},
 			},
 		},
 	}
+
+	CreateScheduler(instance, dep)
+
 	err := ctrl.SetControllerReference(instance, dep, schema)
 	if err != nil {
 		r.Log.Error(err, "Failed to set controller reference for deployment")

@@ -116,12 +116,15 @@ func (in *HiveMetastoreSpec) DeepCopyInto(out *HiveMetastoreSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.Affinity != nil {
+		in, out := &in.Affinity, &out.Affinity
+		*out = new(v1.Affinity)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
-		*out = make([]v1.Toleration, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
+		*out = new(v1.Toleration)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Persistence != nil {
 		in, out := &in.Persistence, &out.Persistence

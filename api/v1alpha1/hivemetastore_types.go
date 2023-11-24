@@ -49,7 +49,10 @@ type HiveMetastoreSpec struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+	Affinity *corev1.Affinity `json:"affinity"`
+
+	// +kubebuilder:validation:Optional
+	Tolerations *corev1.Toleration `json:"tolerations,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	Persistence *PersistenceSpec `json:"persistence,omitempty"`
