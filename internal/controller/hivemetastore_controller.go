@@ -79,7 +79,7 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return ctrl.Result{}, err
 		}
 	}
-
+  
 	r.Log.Info("HiveMetastore found", "Name", hiveMetastore.Name)
 
 	if err := r.reconcileDeployment(ctx, hiveMetastore); err != nil {

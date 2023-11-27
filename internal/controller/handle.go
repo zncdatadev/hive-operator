@@ -213,7 +213,5 @@ func (r *HiveMetastoreReconciler) reconcileSecret(ctx context.Context, instance 
 			return err
 		}
 	}
-	// Create or update the secret
-
 	return nil
 }

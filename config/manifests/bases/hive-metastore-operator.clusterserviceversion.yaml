@@ -7,6 +7,8 @@ metadata:
     datasuit: Develop, Analysis
     icon: https://hive.apache.org/favicon.ico
     capabilities: Basic Install
+    categories: 'Storage, Compute'
+    datasuit: 'Develop, Analysis, Governance'
   name: hive-metastore-operator.v0.0.0
   namespace: placeholder
 spec:
