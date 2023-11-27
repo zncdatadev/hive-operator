@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -116,18 +117,32 @@ func (r *HiveMetastoreReconciler) makeDeployment(instance *stackv1alpha1.HiveMet
 							Resources:       *instance.Spec.Resources,
 							Ports: []corev1.ContainerPort{
 								{
-									ContainerPort: 18080,
+									ContainerPort: 9083,
 									Name:          "http",
 									Protocol:      "TCP",
 								},
 							},
 						},
 					},
-					Tolerations: instance.Spec.Tolerations,
+					InitContainers: []corev1.Container{
+						{
+							Name:            instance.GetNameWithSuffix("init"),
+							Image:           "quay.io/plutoso/alpine-tools:latest",
+							ImagePullPolicy: instance.Spec.Image.PullPolicy,
+							Args: []string{
+								"sh",
+								"-c",
+								"telnet" + " " + instance.Spec.PostgresSecret.Host + " " + instance.Spec.PostgresSecret.Port,
+							},
+						},
+					},
 				},
 			},
 		},
 	}
+
+	CreateScheduler(instance, dep)
+
 	err := ctrl.SetControllerReference(instance, dep, schema)
 	if err != nil {
 		r.Log.Error(err, "Failed to set controller reference for deployment")

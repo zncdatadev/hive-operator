@@ -11,7 +11,7 @@ metadata:
 spec:
   replicas: 1
   service:
-    port: 18080
+    port: 9083
     type: ClusterIP
   image:
     repository: quay.io/plutoso/hive

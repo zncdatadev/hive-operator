@@ -69,8 +69,8 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, nil
 	}
 
-	// Get the status condition, if it exists and its generation is not the
-	//same as the HiveMetastore's generation, reset the status conditions
+	//// Get the status condition, if it exists and its generation is not the
+	////same as the HiveMetastore's generation, reset the status conditions
 	readCondition := apimeta.FindStatusCondition(hiveMetastore.Status.Conditions, stackv1alpha1.ConditionTypeProgressing)
 	if readCondition == nil || readCondition.ObservedGeneration != hiveMetastore.GetGeneration() {
 		hiveMetastore.InitStatusConditions()
@@ -79,13 +79,8 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return ctrl.Result{}, err
 		}
 	}
-
+  
 	r.Log.Info("HiveMetastore found", "Name", hiveMetastore.Name)
-
-	if err := r.reconcileSecret(ctx, hiveMetastore); err != nil {
-		r.Log.Error(err, "unable to reconcile Secret")
-		return ctrl.Result{}, err
-	}
 
 	if err := r.reconcileDeployment(ctx, hiveMetastore); err != nil {
 		r.Log.Error(err, "unable to reconcile Deployment")
@@ -94,6 +89,11 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	if err := r.reconcileService(ctx, hiveMetastore); err != nil {
 		r.Log.Error(err, "unable to reconcile Service")
+		return ctrl.Result{}, err
+	}
+
+	if err := r.reconcileSecret(ctx, hiveMetastore); err != nil {
+		r.Log.Error(err, "unable to reconcile Secret")
 		return ctrl.Result{}, err
 	}
 
