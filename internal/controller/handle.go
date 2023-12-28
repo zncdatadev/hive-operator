@@ -14,7 +14,7 @@ import (
 )
 
 // make service
-func (r *HiveMetastoreReconciler) makeService(instance *stackv1alpha1.HiveMetastore, schema *runtime.Scheme) *corev1.Service {
+func (r *HiveMetastoreReconciler) makeService(instance *stackv1alpha1.HiveMetastore, schema *runtime.Scheme) (*corev1.Service, error) {
 	labels := instance.GetLabels()
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -38,16 +38,16 @@ func (r *HiveMetastoreReconciler) makeService(instance *stackv1alpha1.HiveMetast
 	err := ctrl.SetControllerReference(instance, svc, schema)
 	if err != nil {
 		r.Log.Error(err, "Failed to set controller reference for service")
-		return nil
+		return nil, err
 	}
-	return svc
+	return svc, nil
 }
 
 func (r *HiveMetastoreReconciler) reconcileService(ctx context.Context, instance *stackv1alpha1.HiveMetastore) error {
 	logger := log.FromContext(ctx)
-	obj := r.makeService(instance, r.Scheme)
-	if obj == nil {
-		return nil
+	obj, err := r.makeService(instance, r.Scheme)
+	if err != nil {
+		return err
 	}
 
 	if err := CreateOrUpdate(ctx, r.Client, obj); err != nil {
@@ -57,7 +57,7 @@ func (r *HiveMetastoreReconciler) reconcileService(ctx context.Context, instance
 	return nil
 }
 
-func (r *HiveMetastoreReconciler) makeDeployment(instance *stackv1alpha1.HiveMetastore, schema *runtime.Scheme) *appsv1.Deployment {
+func (r *HiveMetastoreReconciler) makeDeployment(instance *stackv1alpha1.HiveMetastore, schema *runtime.Scheme) (*appsv1.Deployment, error) {
 	labels := instance.GetLabels()
 	secretVarNames := []string{"POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB", "POSTGRES_HOST", "POSTGRES_PORT"}
 	var envVars []corev1.EnvVar
@@ -146,9 +146,9 @@ func (r *HiveMetastoreReconciler) makeDeployment(instance *stackv1alpha1.HiveMet
 	err := ctrl.SetControllerReference(instance, dep, schema)
 	if err != nil {
 		r.Log.Error(err, "Failed to set controller reference for deployment")
-		return nil
+		return nil, err
 	}
-	return dep
+	return dep, nil
 }
 
 func (r *HiveMetastoreReconciler) updateStatusConditionWithDeployment(ctx context.Context, instance *stackv1alpha1.HiveMetastore, status metav1.ConditionStatus, message string) error {
@@ -168,9 +168,9 @@ func (r *HiveMetastoreReconciler) updateStatusConditionWithDeployment(ctx contex
 }
 
 func (r *HiveMetastoreReconciler) reconcileDeployment(ctx context.Context, instance *stackv1alpha1.HiveMetastore) error {
-	obj := r.makeDeployment(instance, r.Scheme)
-	if obj == nil {
-		return nil
+	obj, err := r.makeDeployment(instance, r.Scheme)
+	if err != nil {
+		return err
 	}
 	if err := CreateOrUpdate(ctx, r.Client, obj); err != nil {
 		r.Log.Error(err, "Failed to create or update deployment")
@@ -202,6 +202,9 @@ func makeSecret(ctx context.Context, instance *stackv1alpha1.HiveMetastore, sche
 }
 
 func (r *HiveMetastoreReconciler) reconcileSecret(ctx context.Context, instance *stackv1alpha1.HiveMetastore) error {
+	if instance.Status.IsAvailable() {
+		return nil
+	}
 	objs := makeSecret(ctx, instance, r.Scheme)
 
 	if objs == nil {
