@@ -3,8 +3,6 @@ kind: ClusterServiceVersion
 metadata:
   annotations:
     alm-examples: '[]'
-    categories: Compute
-    datasuit: Develop, Analysis
     icon: https://hive.apache.org/favicon.ico
     capabilities: Basic Install
     categories: 'Storage, Compute'

@@ -7,7 +7,7 @@ require (
 	github.com/go-logr/logr v1.3.0
 	github.com/onsi/ginkgo/v2 v2.13.0
 	github.com/onsi/gomega v1.29.0
-	github.com/zncdata-labs/operator-go v0.0.0-20231225134925-0f88208e24da
+	github.com/zncdata-labs/operator-go v0.0.0-20240103025636-2884a47a1bef
 	k8s.io/api v0.29.0
 	k8s.io/apimachinery v0.29.0
 	k8s.io/client-go v0.29.0

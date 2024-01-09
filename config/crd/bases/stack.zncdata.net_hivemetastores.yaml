@@ -1022,57 +1022,21 @@ spec:
                     default: IfNotPresent
                     description: PullPolicy describes a policy for if/when to pull
                       a container image
+                    enum:
+                    - Always
+                    - Never
+                    - IfNotPresent
                     type: string
                   repository:
-                    default: bitnami/spark
+                    default: docker.io/apache/hive-metastore
                     type: string
                   tag:
-                    default: 3.4.1
+                    default: latest
                     type: string
                 type: object
               nodeSelector:
                 additionalProperties:
                   type: string
-                type: object
-              persistence:
-                properties:
-                  accessMode:
-                    default: ReadWriteOnce
-                    type: string
-                  accessModes:
-                    default:
-                    - ReadWriteOnce
-                    items:
-                      type: string
-                    type: array
-                  annotations:
-                    additionalProperties:
-                      type: string
-                    type: object
-                  enable:
-                    default: true
-                    type: boolean
-                  existingClaim:
-                    type: string
-                  labels:
-                    additionalProperties:
-                      type: string
-                    type: object
-                  size:
-                    default: 10Gi
-                    type: string
-                  storageClass:
-                    type: string
-                  storageClassName:
-                    type: string
-                  storageSize:
-                    default: 10Gi
-                    type: string
-                  volumeMode:
-                    default: Filesystem
-                    description: PersistentVolumeMode describes how a volume is intended
-                      to be consumed, either Block or Filesystem.
-                    type: string
                 type: object
               podSecurityContext:
                 description: PodSecurityContext holds pod-level security attributes
@@ -1489,7 +1453,7 @@ spec:
                       type: string
                     type: object
                   port:
-                    default: 18080
+                    default: 9083
                     format: int32
                     maximum: 65535
                     minimum: 1
@@ -1499,8 +1463,6 @@ spec:
                     description: Service Type string describes ingress methods for
                       a service
                     type: string
-                required:
-                - port
                 type: object
               tolerations:
                 description: The pod this Toleration is attached to tolerates any
@@ -1544,7 +1506,7 @@ spec:
             - securityContext
             type: object
           status:
-            description: ZncdataStatus defines the common state of Zncdata
+            description: Status defines the common status
             properties:
               conditions:
                 items:

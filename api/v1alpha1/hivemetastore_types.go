@@ -17,9 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/zncdata-labs/operator-go/pkg/image"
-	"github.com/zncdata-labs/operator-go/pkg/persistence"
-	"github.com/zncdata-labs/operator-go/pkg/service"
 	"github.com/zncdata-labs/operator-go/pkg/status"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +27,8 @@ import (
 
 // HiveMetastoreSpec defines the desired state of HiveMetastore
 type HiveMetastoreSpec struct {
-	Image image.ImageSpec `json:"image,omitempty"`
+	// +kubebuilder:validation:Required
+	Image ImageSpec `json:"image,omitempty"`
 
 	// +kubebuilder:validation=Optional
 	// +kubebuilder:default=1
@@ -46,7 +44,7 @@ type HiveMetastoreSpec struct {
 	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Service *service.ServiceSpec `json:"service,omitempty"`
+	Service ServiceSpec `json:"service,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
@@ -58,15 +56,40 @@ type HiveMetastoreSpec struct {
 	Tolerations *corev1.Toleration `json:"tolerations,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Persistence *persistence.PersistenceSpec `json:"persistence,omitempty"`
-
-	// +kubebuilder:validation:Optional
 	PostgresSecret *PostgresSecretSpec `json:"postgres,omitempty"`
 }
 
 // GetNameWithSuffix returns the name of the HiveMetastore with the provided suffix appended.
 func (instance *HiveMetastore) GetNameWithSuffix(name string) string {
 	return instance.GetName() + "-" + name
+}
+
+type ImageSpec struct {
+
+	// +kubebuilder:validation=Optional
+	// +kubebuilder:default=docker.io/apache/hive-metastore
+	Repository string `json:"repository,omitempty"`
+
+	// +kubebuilder:validation=Optional
+	// +kubebuilder:default=latest
+	Tag string `json:"tag,omitempty"`
+
+	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
+	// +kubebuilder:default=IfNotPresent
+	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
+}
+
+type ServiceSpec struct {
+	// +kubebuilder:validation:Optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// +kubebuilder:validation:enum=ClusterIP;NodePort;LoadBalancer;ExternalName
+	// +kubebuilder:default=ClusterIP
+	Type corev1.ServiceType `json:"type,omitempty"`
+
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:default=9083
+	Port int32 `json:"port,omitempty"`
 }
 
 type PostgresSecretSpec struct {
@@ -119,8 +142,8 @@ type HiveMetastore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   HiveMetastoreSpec    `json:"spec,omitempty"`
-	Status status.ZncdataStatus `json:"status,omitempty"`
+	Spec   HiveMetastoreSpec `json:"spec,omitempty"`
+	Status status.Status     `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
