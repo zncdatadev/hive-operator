@@ -25,3 +25,7 @@ Dockerfile.cross
 *.swo
 *~
 .vscode
+
+# operator
+bundle
+bundle.Dockerfile

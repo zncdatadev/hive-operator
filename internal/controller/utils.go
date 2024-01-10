@@ -2,9 +2,12 @@ package controller
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	goerr "errors"
 	"github.com/cisco-open/k8s-objectmatcher/patch"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -86,4 +89,61 @@ func CreateOrUpdate(ctx context.Context, c client.Client, obj client.Object) err
 
 	}
 	return err
+}
+
+type Map map[string]string
+
+func (m *Map) MapMerge(source map[string]string, replace bool) {
+	if *m == nil {
+		*m = make(Map)
+	}
+	for sourceKey, sourceValue := range source {
+		if _, ok := map[string]string(*m)[sourceKey]; !ok || replace {
+			map[string]string(*m)[sourceKey] = sourceValue
+		}
+	}
+}
+
+// Convert converts a struct to a map for easy iteration with for range.
+// `struc` can be a pointer or a concrete struct.
+// error will be nil if everything worked.
+func Convert(struc interface{}) (map[string]interface{}, error) {
+
+	returnMap := make(map[string]interface{})
+
+	sType := getStructType(struc)
+
+	if sType.Kind() != reflect.Struct {
+		return returnMap, goerr.New("variable given is not a struct or a pointer to a struct")
+	}
+
+	for i := 0; i < sType.NumField(); i++ {
+		structFieldName := sType.Field(i).Name
+		structVal := reflect.ValueOf(struc)
+		returnMap[structFieldName] = structVal.FieldByName(structFieldName).Interface()
+	}
+
+	return returnMap, nil
+}
+
+func getStructType(struc interface{}) reflect.Type {
+	sType := reflect.TypeOf(struc)
+	if sType.Kind() == reflect.Ptr {
+		sType = sType.Elem()
+	}
+
+	return sType
+}
+
+func extractDecodeData(data *map[string][]byte, key string) (*string, error) {
+	obj := *data
+	if usernameByte, ok := obj[key]; ok {
+		if decodedUsr, err := base64.StdEncoding.DecodeString(string(usernameByte)); err != nil {
+			return nil, err
+		} else {
+			username := string(decodedUsr)
+			return &username, nil
+		}
+	}
+	return nil, fmt.Errorf("byte map data not contain key: %s", key)
 }
