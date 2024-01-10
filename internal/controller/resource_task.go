@@ -37,7 +37,7 @@ func ReconcileTasks(tasks *[]ReconcileTask, ctx context.Context, instance *v1alp
 	for _, task := range *tasks {
 		jobFunc := task.reconcileFunc
 		if err := jobFunc(ctx, instance); err != nil {
-			r.Log.Error(err, "unable to reconcile Deployment")
+			r.Log.Error(err, fmt.Sprintf("unable to reconcile %s", task.resourceName))
 			return err
 		}
 		if updated := instance.Status.SetStatusCondition(v1.Condition{
@@ -47,7 +47,7 @@ func ReconcileTasks(tasks *[]ReconcileTask, ctx context.Context, instance *v1alp
 			Message:            createSuccessMessage(serverName, task.resourceName),
 			ObservedGeneration: instance.GetGeneration(),
 		}); updated {
-			err := utils.UpdateStatus(ctx, r.Client, instance)
+			err := util.UpdateStatus(ctx, r.Client, instance)
 			if err != nil {
 				r.Log.Error(err, createUpdateErrorMessage(task.resourceName))
 				return err

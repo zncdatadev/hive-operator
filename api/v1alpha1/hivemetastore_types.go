@@ -22,9 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // HiveMetastoreSpec defines the desired state of HiveMetastore
 type HiveMetastoreSpec struct {
 	Image ImageSpec `json:"image,omitempty"`
@@ -33,14 +30,7 @@ type HiveMetastoreSpec struct {
 	RoleConfig *RoleConfigSpec `json:"roleConfig"`
 
 	// +kubebuilder:validation:Optional
-	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups"`
-
-	// +kubebuilder:validation=Optional
-	// +kubebuilder:default=1
-	Replicas int32 `json:"replicas,omitempty"`
-
-	// +kubebuilder:validation:Required
-	Resources *corev1.ResourceRequirements `json:"resources"`
+	RoleGroups map[string]*RoleConfigSpec `json:"roleGroups"`
 
 	// +kubebuilder:validation:Required
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
@@ -50,88 +40,13 @@ type HiveMetastoreSpec struct {
 
 	// +kubebuilder:validation:Optional
 	Service *ServiceSpec `json:"service,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Affinity *corev1.Affinity `json:"affinity"`
-
-	// +kubebuilder:validation:Optional
-	Tolerations *corev1.Toleration `json:"tolerations,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Persistence *PersistenceSpec `json:"persistence,omitempty"`
 }
 
 type RoleConfigSpec struct {
 	// +kubebuilder:validation:Optional
-	S3 *S3Spec `json:"s3"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="/opt/hive/data"
-	WarehouseDir string `json:"warehouseDir"`
-
-	// +kubebuilder:validation:Optional
-	PostgresSecret *PostgresSecretSpec `json:"postgres,omitempty"`
-}
-
-type S3Spec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="http://bucket.example.com"
-	Endpoint string `json:"endpoint"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=15
-	MaxConnect int `json:"maxConnect"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="us-east-1"
-	Region string `json:"region"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=false
-	EnableSSL bool `json:"enableSSL"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=true
-	FastUpload bool `json:"fastUpload"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="accessKey"
-	AccessKey string `json:"accessKey"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="secret"
-	SecretKey string `json:"secretKey"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=true
-	PathStyleAccess bool `json:"pathStyleAccess"`
-}
-
-type FsCleanerSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=true
-	Enabled bool `json:"enabled,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=50
-	MaxNum int32 `json:"maxNum,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="7d"
-	MaxAge string `json:"maxAge,omitempty"`
-}
-
-type RoleGroupSpec struct {
-	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=1
 	Replicas int32 `json:"replicas"`
 
-	// +kubebuilder:validation:Optional
-	Config *ConfigRoleGroupSpec `json:"config"`
-}
-
-type ConfigRoleGroupSpec struct {
 	// +kubebuilder:validation:Optional
 	Image *ImageSpec `json:"image"`
 
@@ -151,42 +66,53 @@ type ConfigRoleGroupSpec struct {
 	Tolerations *corev1.Toleration `json:"tolerations"`
 
 	// +kubebuilder:validation:Optional
-	Resources *corev1.ResourceRequirements `json:"resources"`
-
-	// +kubebuilder:validation:Optional
 	Service *ServiceSpec `json:"service"`
 
 	// +kubebuilder:validation:Optional
-	Persistence *PersistenceSpec `json:"persistence"`
+	// +kubebuilder:default:="/opt/hive/data"
+	WarehouseDir string `json:"warehouseDir"`
 
 	// +kubebuilder:validation:Optional
-	PostgresSecret *PostgresSecretSpec `json:"postgres,omitempty"`
+	StorageClass *string `json:"storageClass,omitempty"`
+
+	// +kubebuilder:default="10Gi"
+	StorageSize string `json:"size,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Config *ConfigSpec `json:"config"`
+}
+
+type ConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	Resources *corev1.ResourceRequirements `json:"resources"`
+
+	// +kubebuilder:validation:Optional
+	Database *DatabaseSpec `json:"database,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	S3 *S3Spec `json:"s3"`
 }
 
+type DatabaseSpec struct {
+	Reference string `json:"reference"`
+}
+
+type S3Spec struct {
+	S3BucketSpec `json:"bucket"`
+	// +kubebuilder:validation=Optional
+	// +kubebuilder:default=20
+	MaxConnect int `json:"maxConnect"`
+	// +kubebuilder:validation=Optional
+	PathStyleAccess bool `json:"pathStyle_access"`
+}
+
+type S3BucketSpec struct {
+	Reference string `json:"reference"`
+}
+
 // GetNameWithSuffix returns the name of the HiveMetastore with the provided suffix appended.
 func (instance *HiveMetastore) GetNameWithSuffix(name string) string {
 	return instance.GetName() + "-" + name
-}
-
-type PostgresSecretSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="postgresql"
-	Host string `json:"host,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="5432"
-	Port string `json:"port"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="hive"
-	UserName string `json:"username"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="12345678"
-	Password string `json:"password"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="hive"
-	DataBase string `json:"database"`
 }
 
 type ImageSpec struct {
@@ -207,6 +133,7 @@ type ImageSpec struct {
 type ServiceSpec struct {
 	// +kubebuilder:validation:Optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// +kubebuilder:validation:enum=ClusterIP;NodePort;LoadBalancer;ExternalName
 	// +kubebuilder:default=ClusterIP
 	Type corev1.ServiceType `json:"type,omitempty"`
@@ -215,34 +142,6 @@ type ServiceSpec struct {
 	// +kubebuilder:validation:Maximum=65535
 	// +kubebuilder:default=9083
 	Port int32 `json:"port,omitempty"`
-}
-
-type PersistenceSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=true
-	Enable bool `json:"enable,omitempty"`
-	// +kubebuilder:validation:Optional
-	StorageClass *string `json:"storageClass,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ReadWriteOnce}
-	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
-
-	// +kubebuilder:default="10Gi"
-	Size string `json:"size,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	ExistingClaim *string `json:"existingClaim,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=Filesystem
-	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Labels map[string]string `json:"labels,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // GetPvcName returns the name of the PVC for the HiveMetastore.
@@ -269,9 +168,8 @@ type HiveMetastoreStatus struct {
 	Conditions []metav1.Condition `json:"condition,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // HiveMetastore is the Schema for the hivemetastores API
 type HiveMetastore struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -281,9 +179,7 @@ type HiveMetastore struct {
 	Status status.Status     `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-
-// HiveMetastoreList contains a list of HiveMetastore
+// +kubebuilder:object:root=true
 type HiveMetastoreList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

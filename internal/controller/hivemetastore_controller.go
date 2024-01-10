@@ -48,15 +48,8 @@ type HiveMetastoreReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the HiveMetastore object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
+// For more details, check Reconcile and its Result here: - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log.Info("Reconciling instance")
 
@@ -77,7 +70,7 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if readCondition == nil || readCondition.ObservedGeneration != hiveMetastore.GetGeneration() {
 		hiveMetastore.InitStatusConditions()
 
-		if err := utils.UpdateStatus(ctx, r.Client, hiveMetastore); err != nil {
+		if err := util.UpdateStatus(ctx, r.Client, hiveMetastore); err != nil {
 			r.Log.Error(err, "unable to update HiveMetastoreServer status")
 			return ctrl.Result{}, err
 		}
@@ -119,7 +112,7 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		ObservedGeneration: hiveMetastore.GetGeneration(),
 	})
 
-	if err := utils.UpdateStatus(ctx, r.Client, hiveMetastore); err != nil {
+	if err := util.UpdateStatus(ctx, r.Client, hiveMetastore); err != nil {
 		r.Log.Error(err, "unable to update SparkHistoryServer status")
 		return ctrl.Result{}, err
 	}

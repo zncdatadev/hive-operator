@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	stackv1alpha1 "github.com/zncdata-labs/hive-metastore-operator/api/v1alpha1"
+	opgo "github.com/zncdata-labs/operator-go/pkg/apis/commons/v1alpha1"
 	"github.com/zncdata-labs/operator-go/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,9 +22,9 @@ type Resource interface {
 }
 
 func (r *HiveMetastoreReconciler) createOrUpdateResource(ctx context.Context, instance *stackv1alpha1.HiveMetastore,
-	roleGroupExtractor func(*stackv1alpha1.HiveMetastore, string, *stackv1alpha1.RoleGroupSpec,
+	roleGroupExtractor func(*stackv1alpha1.HiveMetastore, context.Context, string, *stackv1alpha1.RoleConfigSpec,
 		*runtime.Scheme) (*client.Object, error)) error {
-	resources, err := r.extractResources(instance, roleGroupExtractor)
+	resources, err := r.extractResources(instance, ctx, roleGroupExtractor)
 	if err != nil {
 		return err
 	}
@@ -40,7 +42,23 @@ func (r *HiveMetastoreReconciler) createOrUpdateResource(ctx context.Context, in
 	return nil
 }
 
-func (r *HiveMetastoreReconciler) getRoleGroupLabels(config *stackv1alpha1.ConfigRoleGroupSpec) map[string]string {
+func (r *HiveMetastoreReconciler) fetchResource(ctx context.Context, obj client.Object,
+	instance *stackv1alpha1.HiveMetastore) error {
+	name := obj.GetName()
+	kind := obj.GetObjectKind()
+	if err := r.Get(ctx, client.ObjectKey{Namespace: instance.Namespace, Name: name}, obj); err != nil {
+		opt := []any{"ns", instance.Namespace, "name", name, "kind", kind}
+		if apierrors.IsNotFound(err) {
+			r.Log.Error(err, "Fetch resource NotFound", opt...)
+		} else {
+			r.Log.Error(err, "Fetch resource occur some unknown err", opt...)
+		}
+		return err
+	}
+	return nil
+}
+
+func (r *HiveMetastoreReconciler) getRoleGroupLabels(config *stackv1alpha1.RoleConfigSpec) map[string]string {
 	additionalLabels := make(map[string]string)
 	if configLabels := config.MatchLabels; configLabels != nil {
 		for k, v := range config.MatchLabels {
@@ -51,30 +69,27 @@ func (r *HiveMetastoreReconciler) getRoleGroupLabels(config *stackv1alpha1.Confi
 }
 
 func (r *HiveMetastoreReconciler) mergeLabels(mergeLabels *Map, instanceLabels map[string]string,
-	roleGroup *stackv1alpha1.RoleGroupSpec) {
+	roleGroup *stackv1alpha1.RoleConfigSpec) {
 	mergeLabels.MapMerge(instanceLabels, true)
-	mergeLabels.MapMerge(r.getRoleGroupLabels(roleGroup.Config), true)
+	mergeLabels.MapMerge(r.getRoleGroupLabels(roleGroup), true)
 }
 
 func (r *HiveMetastoreReconciler) getServiceInfo(instanceSvc *stackv1alpha1.ServiceSpec,
-	roleGroup *stackv1alpha1.RoleGroupSpec) (int32, corev1.ServiceType, map[string]string) {
-	var targetSvc *stackv1alpha1.ServiceSpec
-	if roleGroup != nil && roleGroup.Config != nil && roleGroup.Config.Service != nil {
-		targetSvc = roleGroup.Config.Service
-	}
-	if targetSvc == nil {
-		targetSvc = instanceSvc
+	roleGroup *stackv1alpha1.RoleConfigSpec) (int32, corev1.ServiceType, map[string]string) {
+	var targetSvc = instanceSvc
+	if roleGroup != nil && roleGroup.Service != nil {
+		targetSvc = roleGroup.Service
 	}
 	return targetSvc.Port, targetSvc.Type, targetSvc.Annotations
 }
 
-func (r *HiveMetastoreReconciler) extractResources(instance *stackv1alpha1.HiveMetastore,
-	roleGroupExtractor func(*stackv1alpha1.HiveMetastore, string, *stackv1alpha1.RoleGroupSpec,
+func (r *HiveMetastoreReconciler) extractResources(instance *stackv1alpha1.HiveMetastore, ctx context.Context,
+	roleGroupExtractor func(*stackv1alpha1.HiveMetastore, context.Context, string, *stackv1alpha1.RoleConfigSpec,
 		*runtime.Scheme) (*client.Object, error)) ([]*client.Object, error) {
 	var resources []*client.Object
 	if instance.Spec.RoleGroups != nil {
 		for roleGroupName, roleGroup := range instance.Spec.RoleGroups {
-			rsc, err := roleGroupExtractor(instance, roleGroupName, roleGroup, r.Scheme)
+			rsc, err := roleGroupExtractor(instance, ctx, roleGroupName, roleGroup, r.Scheme)
 			if err != nil {
 				return nil, err
 			}
@@ -92,35 +107,23 @@ func (r *HiveMetastoreReconciler) reconcilePvc(ctx context.Context, instance *st
 	return nil
 }
 
-func (r *HiveMetastoreReconciler) extractPvcForRoleGroup(instance *stackv1alpha1.HiveMetastore, groupName string,
-	roleGroup *stackv1alpha1.RoleGroupSpec, scheme *runtime.Scheme) (*client.Object, error) {
+func (r *HiveMetastoreReconciler) extractPvcForRoleGroup(instance *stackv1alpha1.HiveMetastore, _ context.Context,
+	groupName string, roleGroup *stackv1alpha1.RoleConfigSpec, scheme *runtime.Scheme) (*client.Object, error) {
 
 	var mergeLabels Map
 	r.mergeLabels(&mergeLabels, instance.GetLabels(), roleGroup)
 
 	var (
-		storageClassName *string
-		accessMode       []corev1.PersistentVolumeAccessMode
-		storageSize      string
-		volumeMode       *corev1.PersistentVolumeMode
+		storageClassName = instance.Spec.RoleConfig.StorageClass
+		storageSize      = instance.Spec.RoleConfig.StorageSize
+		volumeMode       = corev1.PersistentVolumeFilesystem
 	)
-	if roleGroup != nil && roleGroup.Config != nil {
-		if rgPersistence := roleGroup.Config.Persistence; rgPersistence != nil {
-			if !rgPersistence.Enable {
-				return nil, nil
-			}
-			storageClassName = rgPersistence.StorageClass
-			accessMode = rgPersistence.AccessModes
-			storageSize = rgPersistence.Size
-			volumeMode = rgPersistence.VolumeMode
-		} else {
-			if instancePersistence := instance.Spec.Persistence; !instancePersistence.Enable {
-				storageClassName = instancePersistence.StorageClass
-				accessMode = instancePersistence.AccessModes
-				storageSize = instancePersistence.Size
-				volumeMode = instancePersistence.VolumeMode
-			}
-			return nil, nil
+	if roleGroup != nil {
+		if rgStorageClass := roleGroup.StorageClass; rgStorageClass != nil {
+			storageClassName = rgStorageClass
+		}
+		if rgStorageSize := roleGroup.StorageSize; rgStorageSize != "" {
+			storageSize = rgStorageSize
 		}
 	}
 
@@ -132,13 +135,13 @@ func (r *HiveMetastoreReconciler) extractPvcForRoleGroup(instance *stackv1alpha1
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			StorageClassName: storageClassName,
-			AccessModes:      accessMode,
+			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: resource.MustParse(storageSize),
 				},
 			},
-			VolumeMode: volumeMode,
+			VolumeMode: &volumeMode,
 		},
 	}
 
@@ -160,8 +163,8 @@ func (r *HiveMetastoreReconciler) reconcileService(ctx context.Context, instance
 	return nil
 }
 
-func (r *HiveMetastoreReconciler) extractServiceForRoleGroup(instance *stackv1alpha1.HiveMetastore, groupName string,
-	roleGroup *stackv1alpha1.RoleGroupSpec, scheme *runtime.Scheme) (*client.Object, error) {
+func (r *HiveMetastoreReconciler) extractServiceForRoleGroup(instance *stackv1alpha1.HiveMetastore, _ context.Context,
+	groupName string, roleGroup *stackv1alpha1.RoleConfigSpec, scheme *runtime.Scheme) (*client.Object, error) {
 	var mergeLabels Map
 	r.mergeLabels(&mergeLabels, instance.GetLabels(), roleGroup)
 
@@ -204,19 +207,62 @@ func (r *HiveMetastoreReconciler) reconcileConfigMap(ctx context.Context, instan
 	return nil
 }
 
-func (r *HiveMetastoreReconciler) extractConfigMapForRoleGroup(instance *stackv1alpha1.HiveMetastore, roleGroupName string,
-	roleGroup *stackv1alpha1.RoleGroupSpec, schema *runtime.Scheme) (*client.Object, error) {
+func (r *HiveMetastoreReconciler) fetchS3(s3Bucket *opgo.S3Bucket, ctx context.Context,
+	instance *stackv1alpha1.HiveMetastore) (*opgo.S3Connection, error) {
+	// 1 - fetch exists s3-bucket by reference
+	cliObj := client.Object(s3Bucket)
+	if err := r.fetchResource(ctx, cliObj, instance); err != nil {
+		return nil, err
+	}
+	//2 - fetch exist s3-collection by pre-fetch bucketName
+	s3Collection := &opgo.S3Connection{
+		ObjectMeta: metav1.ObjectMeta{Name: s3Bucket.Spec.Reference},
+	}
+	collCliObj := client.Object(s3Collection)
+	if err := r.fetchResource(ctx, collCliObj, instance); err != nil {
+		return nil, err
+	}
+	return s3Collection, nil
+}
+
+func (r *HiveMetastoreReconciler) fetchDb(database *opgo.Database, ctx context.Context,
+	instance *stackv1alpha1.HiveMetastore) (*opgo.DatabaseConnection, error) {
+	// 1 - fetch exists Database by reference
+	cliObj := client.Object(database)
+	if err := r.fetchResource(ctx, cliObj, instance); err != nil {
+		return nil, err
+	}
+	//2 - fetch exist database collection by pre-fetch 'database.spec.name'
+	dbCollection := &opgo.DatabaseConnection{
+		ObjectMeta: metav1.ObjectMeta{Name: database.Spec.DatabaseName},
+	}
+	collCliObj := client.Object(dbCollection)
+	if err := r.fetchResource(ctx, collCliObj, instance); err != nil {
+		return nil, err
+	}
+	return dbCollection, nil
+}
+
+func (r *HiveMetastoreReconciler) extractConfigMapForRoleGroup(instance *stackv1alpha1.HiveMetastore, ctx context.Context,
+	roleGroupName string, roleGroup *stackv1alpha1.RoleConfigSpec, schema *runtime.Scheme) (*client.Object, error) {
 	var mergeLabels Map
 	r.mergeLabels(&mergeLabels, instance.GetLabels(), roleGroup)
 
-	var s3Cfg *stackv1alpha1.S3Spec
+	var s3Cfg = instance.Spec.RoleConfig.Config.S3
 	if roleGroup != nil {
 		if rgCfg := roleGroup.Config; rgCfg != nil {
 			s3Cfg = rgCfg.S3
 		}
 	}
 	if s3Cfg == nil {
-		s3Cfg = instance.Spec.RoleConfig.S3
+		return nil, nil
+	}
+	s3Bucket := &opgo.S3Bucket{
+		ObjectMeta: metav1.ObjectMeta{Name: s3Cfg.Reference},
+	}
+	s3Collection, err := r.fetchS3(s3Bucket, ctx, instance)
+	if err != nil {
+		return nil, err
 	}
 
 	var xmlFileTmp = "" +
@@ -267,12 +313,12 @@ func (r *HiveMetastoreReconciler) extractConfigMapForRoleGroup(instance *stackv1
 			Labels:    mergeLabels,
 		},
 		Data: map[string]string{
-			"hive-site.xml": fmt.Sprintf(xmlFileTmp, s3Cfg.MaxConnect, s3Cfg.EnableSSL, s3Cfg.Endpoint,
+			"hive-site.xml": fmt.Sprintf(xmlFileTmp, s3Cfg.MaxConnect, s3Collection.Spec.SSL, s3Collection.Spec.Endpoint,
 				s3Cfg.PathStyleAccess),
 		},
 	}
-	err := ctrl.SetControllerReference(instance, cm, schema)
-	if err != nil {
+
+	if err := ctrl.SetControllerReference(instance, cm, schema); err != nil {
 		r.Log.Error(err, "Failed to set controller reference for configmap")
 		return nil, err
 	}
@@ -288,8 +334,28 @@ func (r *HiveMetastoreReconciler) reconcileDeployment(ctx context.Context, insta
 	return nil
 }
 
-func (r *HiveMetastoreReconciler) extractDeploymentForRoleGroup(instance *stackv1alpha1.HiveMetastore, roleGroupName string,
-	roleGroup *stackv1alpha1.RoleGroupSpec, schema *runtime.Scheme) (*client.Object, error) {
+func (r *HiveMetastoreReconciler) fetchDbForRoleGroup(instance *stackv1alpha1.HiveMetastore, ctx context.Context,
+	roleGroup *stackv1alpha1.RoleConfigSpec) (*opgo.Database, *opgo.DatabaseConnection, error) {
+	var db *stackv1alpha1.DatabaseSpec
+	if roleGroup != nil && roleGroup.Config != nil {
+		if rgDatabase := roleGroup.Config.Database; rgDatabase != nil {
+			db = rgDatabase
+		} else {
+			db = instance.Spec.RoleConfig.Config.Database
+		}
+	}
+	dbrsc := &opgo.Database{
+		ObjectMeta: metav1.ObjectMeta{Name: db.Reference},
+	}
+	dbCollection, err := r.fetchDb(dbrsc, ctx, instance)
+	if err != nil {
+		return nil, nil, err
+	}
+	return dbrsc, dbCollection, nil
+}
+
+func (r *HiveMetastoreReconciler) extractDeploymentForRoleGroup(instance *stackv1alpha1.HiveMetastore, ctx context.Context,
+	roleGroupName string, roleGroup *stackv1alpha1.RoleConfigSpec, schema *runtime.Scheme) (*client.Object, error) {
 	var mergeLabels Map
 	r.mergeLabels(&mergeLabels, instance.GetLabels(), roleGroup)
 
@@ -297,13 +363,13 @@ func (r *HiveMetastoreReconciler) extractDeploymentForRoleGroup(instance *stackv
 		image       stackv1alpha1.ImageSpec
 		securityCtx *corev1.PodSecurityContext
 	)
-	if roleGroup != nil && roleGroup.Config != nil {
-		if rgImage := roleGroup.Config.Image; rgImage != nil {
+	if roleGroup != nil {
+		if rgImage := roleGroup.Image; rgImage != nil {
 			image = *rgImage
 		} else {
 			image = instance.Spec.Image
 		}
-		if rgSecurityCtx := roleGroup.Config.SecurityContext; rgSecurityCtx != nil {
+		if rgSecurityCtx := roleGroup.SecurityContext; rgSecurityCtx != nil {
 			securityCtx = rgSecurityCtx
 		} else {
 			securityCtx = instance.Spec.SecurityContext
@@ -312,7 +378,12 @@ func (r *HiveMetastoreReconciler) extractDeploymentForRoleGroup(instance *stackv
 
 	hiveConfVolumeNameFunc := func() string { return instance.GetNameWithSuffix(roleGroupName + "-conf") }
 	hiveDataVolumeNameFunc := func() string { return instance.GetNameWithSuffix(roleGroupName + "-data") }
-
+	var dbCollection *opgo.DatabaseConnection
+	var err error
+	if _, dbCollection, err = r.fetchDbForRoleGroup(instance, ctx, roleGroup); err != nil {
+		return nil, errors.Wrap(err, "Fetch db collection for roleGroup err")
+	}
+	pg := dbCollection.Spec.Provider.Postgres
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.GetNameWithSuffix(roleGroupName),
@@ -367,13 +438,13 @@ func (r *HiveMetastoreReconciler) extractDeploymentForRoleGroup(instance *stackv
 					},
 					InitContainers: []corev1.Container{
 						{
-							Name:            instance.GetNameWithSuffix("init"),
+							Name:            instance.GetNameWithSuffix(roleGroupName + "-init"),
 							Image:           "quay.io/plutoso/alpine-tools:latest",
 							ImagePullPolicy: image.PullPolicy,
 							Args: []string{
 								"sh",
 								"-c",
-								"telnet" + " " + instance.Spec.RoleConfig.PostgresSecret.Host + " " + instance.Spec.RoleConfig.PostgresSecret.Port,
+								fmt.Sprintf("telnet %s %d", pg.Host, pg.Port),
 							},
 						},
 					},
@@ -407,7 +478,7 @@ func (r *HiveMetastoreReconciler) extractDeploymentForRoleGroup(instance *stackv
 			},
 		},
 	}
-	err := ctrl.SetControllerReference(instance, dep, schema)
+	err = ctrl.SetControllerReference(instance, dep, schema)
 	if err != nil {
 		r.Log.Error(err, "Failed to set controller reference for deployment")
 		return nil, err
@@ -424,51 +495,65 @@ func (r *HiveMetastoreReconciler) reconcileSecret(ctx context.Context, instance 
 	return nil
 }
 
-func (r *HiveMetastoreReconciler) extractSecretForRoleGroup(instance *stackv1alpha1.HiveMetastore, roleGroupName string,
-	roleGroup *stackv1alpha1.RoleGroupSpec, schema *runtime.Scheme) (*client.Object, error) {
+func (r *HiveMetastoreReconciler) extractSecretForRoleGroup(instance *stackv1alpha1.HiveMetastore, ctx context.Context,
+	roleGroupName string, roleGroup *stackv1alpha1.RoleConfigSpec, schema *runtime.Scheme) (*client.Object, error) {
 	var mergeLabels Map
 	r.mergeLabels(&mergeLabels, instance.GetLabels(), roleGroup)
 
 	// https://cwiki.apache.org/confluence/display/Hive/Setting+Up+Hive+with+Docker
 	var (
-		awsKeyId  string
-		awsSecret string
-		awsRegion string
-
-		serviceOpts string
+		s3 *stackv1alpha1.S3Spec
+		db *stackv1alpha1.DatabaseSpec
 	)
+	if roleCfg := instance.Spec.RoleConfig; roleCfg != nil {
+		s3 = roleCfg.Config.S3
+	}
 	if roleGroup != nil && roleGroup.Config != nil {
 		if rgS3 := roleGroup.Config.S3; rgS3 != nil {
-			awsKeyId = rgS3.AccessKey
-			awsSecret = rgS3.SecretKey
-			awsRegion = rgS3.Region
+			s3 = rgS3
 		} else if roleCfg := instance.Spec.RoleConfig; roleCfg != nil {
-			awsKeyId = roleCfg.S3.AccessKey
-			awsSecret = roleCfg.S3.SecretKey
-			awsRegion = roleCfg.S3.Region
+			s3 = roleCfg.Config.S3
 		}
-		var postgres *stackv1alpha1.PostgresSecretSpec
-		if rgPg := roleGroup.Config.PostgresSecret; rgPg != nil {
-			postgres = rgPg
+		if rgPg := roleGroup.Config.Database; rgPg != nil {
+			db = rgPg
 		} else {
-			postgres = instance.Spec.RoleConfig.PostgresSecret
+			db = instance.Spec.RoleConfig.Config.Database
 		}
-		serviceOptsTemp := "-Xmx1G -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver\n" +
-			"              -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://%s:%s/%s\n" +
-			"              -Djavax.jdo.option.ConnectionUserName=%s\n" +
-			"              -Djavax.jdo.option.ConnectionPassword=%s"
-		serviceOpts = fmt.Sprintf(serviceOptsTemp, postgres.Host, postgres.Port, postgres.DataBase, postgres.UserName,
-			postgres.Password)
+	}
+
+	var (
+		s3Collection *opgo.S3Connection
+		dbrsc        *opgo.Database
+		dbCollection *opgo.DatabaseConnection
+		err          error
+	)
+	if s3 != nil {
+		s3Bucket := &opgo.S3Bucket{
+			ObjectMeta: metav1.ObjectMeta{Name: s3.Reference},
+		}
+		s3Collection, err = r.fetchS3(s3Bucket, ctx, instance)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if db != nil {
+		dbrsc = &opgo.Database{
+			ObjectMeta: metav1.ObjectMeta{Name: db.Reference},
+		}
+		dbCollection, err = r.fetchDb(dbrsc, ctx, instance)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if dbrsc == nil {
+		return nil, errors.New(fmt.Sprintf("Role-group: %s should set a database config in role-group-config, role-config or cluster-config"))
 	}
 
 	data := make(map[string][]byte)
-	data["DB_DRIVER"] = []byte("postgres")
-	data["AWS_ACCESS_KEY_ID"] = []byte(awsKeyId)
-	data["AWS_SECRET_ACCESS_KEY"] = []byte(awsSecret)
-	data["AWS_DEFAULT_REGION"] = []byte(awsRegion)
-	data["SERVICE_NAME"] = []byte("metastore -hiveconf hive.root.logger=INFO,console")
-	data["SERVICE_OPTS"] = []byte(serviceOpts)
-
+	if err = r.makeDatabaseData(dbrsc, dbCollection, ctx, instance, &data); err != nil {
+		return nil, err
+	}
+	r.makeS3Data(s3Collection, &data)
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.GetNameWithSuffix(roleGroupName),
@@ -478,7 +563,64 @@ func (r *HiveMetastoreReconciler) extractSecretForRoleGroup(instance *stackv1alp
 		Type: corev1.SecretTypeOpaque,
 		Data: data,
 	}
+
+	if err := ctrl.SetControllerReference(instance, secret, schema); err != nil {
+		r.Log.Error(err, "Failed to set controller reference for secret")
+		return nil, err
+	}
 	secretEx := client.Object(secret)
 	return &secretEx, nil
+}
 
+func (r *HiveMetastoreReconciler) makeDatabaseData(dbrsc *opgo.Database, dbCollection *opgo.DatabaseConnection,
+	ctx context.Context, instance *stackv1alpha1.HiveMetastore, data *map[string][]byte) error {
+	fetchUsrPassFunc := func() ([]string, error) {
+		dbCredential := dbrsc.Spec.Credential
+		if existSecretRef := dbCredential.ExistSecret; existSecretRef != "" {
+			existCredentialSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: existSecretRef}}
+			cliObj := client.Object(existCredentialSecret)
+			if err := r.fetchResource(ctx, cliObj, instance); err != nil {
+				return nil, err
+			}
+			credentialByteData := &existCredentialSecret.Data
+			var username, passwd string
+			if usr, err := extractDecodeData(credentialByteData, "username"); err != nil {
+				return nil, err
+			} else {
+				username = *usr
+			}
+			if pass, err := extractDecodeData(credentialByteData, "password"); err != nil {
+				return nil, err
+			} else {
+				passwd = *pass
+			}
+			return []string{username, passwd}, nil
+		}
+		return []string{dbCredential.Username, dbCredential.Password}, nil
+	}
+
+	var usrPass []string
+	var err error
+	if usrPass, err = fetchUsrPassFunc(); err != nil {
+		return errors.Wrap(err, "Fetch username and password error")
+	}
+	serviceOptsTemp := "-Xmx1G -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver\n" +
+		"              -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://%s:%d/%s\n" +
+		"              -Djavax.jdo.option.ConnectionUserName=%s\n" +
+		"              -Djavax.jdo.option.ConnectionPassword=%s"
+	pg := dbCollection.Spec.Provider.Postgres
+	serviceOpts := fmt.Sprintf(serviceOptsTemp, pg.Host, pg.Port, dbCollection.Name, usrPass[0], usrPass[1])
+	(*data)["DB_DRIVER"] = []byte(pg.Driver)
+	(*data)["SERVICE_NAME"] = []byte("metastore -hiveconf hive.root.logger=INFO,console")
+	(*data)["SERVICE_OPTS"] = []byte(serviceOpts)
+	return nil
+}
+
+func (r *HiveMetastoreReconciler) makeS3Data(s3Collection *opgo.S3Connection, data *map[string][]byte) {
+	if s3Collection != nil {
+		s3Credential := s3Collection.Spec.S3Credential
+		(*data)["AWS_ACCESS_KEY_ID"] = []byte(s3Credential.AccessKey)
+		(*data)["AWS_SECRET_ACCESS_KEY"] = []byte(s3Credential.SecretKey)
+		(*data)["AWS_DEFAULT_REGION"] = []byte(s3Collection.Spec.Region)
+	}
 }

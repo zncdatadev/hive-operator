@@ -8,21 +8,21 @@ import (
 )
 
 // CreateScheduler todo: refactor
-func CreateScheduler(instance *stackv1alpha1.HiveMetastore, dep *appsv1.Deployment, roleGroup *stackv1alpha1.RoleGroupSpec) {
+func CreateScheduler(instance *stackv1alpha1.HiveMetastore, dep *appsv1.Deployment, roleGroup *stackv1alpha1.RoleConfigSpec) {
 
 	var (
-		nodeSelector = instance.Spec.NodeSelector
-		tolerations  = instance.Spec.Tolerations
-		affinity     = instance.Spec.Affinity
+		nodeSelector = instance.Spec.RoleConfig.NodeSelector
+		tolerations  = instance.Spec.RoleConfig.Tolerations
+		affinity     = instance.Spec.RoleConfig.Affinity
 	)
-	if roleGroup != nil && roleGroup.Config != nil {
-		if rgNodeSelector := roleGroup.Config.NodeSelector; rgNodeSelector != nil {
+	if roleGroup != nil {
+		if rgNodeSelector := roleGroup.NodeSelector; rgNodeSelector != nil {
 			nodeSelector = rgNodeSelector
 		}
-		if rgTolerations := roleGroup.Config.Tolerations; rgTolerations != nil {
+		if rgTolerations := roleGroup.Tolerations; rgTolerations != nil {
 			tolerations = rgTolerations
 		}
-		if rgAffinity := roleGroup.Config.Affinity; rgAffinity != nil {
+		if rgAffinity := roleGroup.Affinity; rgAffinity != nil {
 			affinity = rgAffinity
 		}
 	}

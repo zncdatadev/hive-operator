@@ -9,7 +9,6 @@ metadata:
     app.kubernetes.io/created-by: hive-metastore-operator
   name: hivemetastore-sample
 spec:
-  replicas: 2
   service:
     port: 9083
     type: ClusterIP
@@ -17,18 +16,16 @@ spec:
     repository: quay.io/plutoso/hive
     tag: 4.0.0-beta-1
     pullPolicy: IfNotPresent
-  resources:
-    requests:
-      cpu: 100m
-      memory: 512Mi
   roleConfig:
-    postgres:
-      host: postgresql.default.svc
-      port: "5432"
-      username: hive
-      password: "12345678"
-      database: metastore
-#    s3:
+    replicas: 2
+    config:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+      database:
+        reference: "database-sample"
+  #    s3:
   roleGroups:
     default:
       replicas: 1
@@ -37,8 +34,13 @@ spec:
           requests:
             cpu: 100m
             memory: 512Mi
-        matchLabels:
-          app: foo
+        s3:
+          maxConnect: 50
+          pathStyle_access: true
+          bucket:
+            reference: "s3bucket-sample"
+      matchLabels:
+        app: foo
     foo:
       replicas: 1
       config:
@@ -46,8 +48,8 @@ spec:
           requests:
             cpu: 100m
             memory: 256Mi
-        matchLabels:
-          app: foo
+      matchLabels:
+        app: foo
   securityContext:
     runAsUser: 1000
     fsGroup: 1000
