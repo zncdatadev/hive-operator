@@ -17,8 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/zncdata-labs/operator-go/pkg/status"
 	corev1 "k8s.io/api/core/v1"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,6 +28,12 @@ import (
 // HiveMetastoreSpec defines the desired state of HiveMetastore
 type HiveMetastoreSpec struct {
 	Image ImageSpec `json:"image,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	RoleConfig *RoleConfigSpec `json:"roleConfig"`
+
+	// +kubebuilder:validation:Optional
+	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups"`
 
 	// +kubebuilder:validation=Optional
 	// +kubebuilder:default=1
@@ -56,9 +62,108 @@ type HiveMetastoreSpec struct {
 
 	// +kubebuilder:validation:Optional
 	Persistence *PersistenceSpec `json:"persistence,omitempty"`
+}
+
+type RoleConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	S3 *S3Spec `json:"s3"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="/opt/hive/data"
+	WarehouseDir string `json:"warehouseDir"`
 
 	// +kubebuilder:validation:Optional
 	PostgresSecret *PostgresSecretSpec `json:"postgres,omitempty"`
+}
+
+type S3Spec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="http://bucket.example.com"
+	Endpoint string `json:"endpoint"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=15
+	MaxConnect int `json:"maxConnect"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="us-east-1"
+	Region string `json:"region"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=false
+	EnableSSL bool `json:"enableSSL"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=true
+	FastUpload bool `json:"fastUpload"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="accessKey"
+	AccessKey string `json:"accessKey"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="secret"
+	SecretKey string `json:"secretKey"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=true
+	PathStyleAccess bool `json:"pathStyleAccess"`
+}
+
+type FsCleanerSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=true
+	Enabled bool `json:"enabled,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=50
+	MaxNum int32 `json:"maxNum,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="7d"
+	MaxAge string `json:"maxAge,omitempty"`
+}
+
+type RoleGroupSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=1
+	Replicas int32 `json:"replicas"`
+
+	// +kubebuilder:validation:Optional
+	Config *ConfigRoleGroupSpec `json:"config"`
+}
+
+type ConfigRoleGroupSpec struct {
+	// +kubebuilder:validation:Optional
+	Image *ImageSpec `json:"image"`
+
+	// +kubebuilder:validation:Optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
+
+	// +kubebuilder:validation:Optional
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Affinity *corev1.Affinity `json:"affinity"`
+
+	// +kubebuilder:validation:Optional
+	NodeSelector map[string]string `json:"nodeSelector"`
+
+	// +kubebuilder:validation:Optional
+	Tolerations *corev1.Toleration `json:"tolerations"`
+
+	// +kubebuilder:validation:Optional
+	Resources *corev1.ResourceRequirements `json:"resources"`
+
+	// +kubebuilder:validation:Optional
+	Service *ServiceSpec `json:"service"`
+
+	// +kubebuilder:validation:Optional
+	Persistence *PersistenceSpec `json:"persistence"`
+
+	// +kubebuilder:validation:Optional
+	PostgresSecret *PostgresSecretSpec `json:"postgres,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	S3 *S3Spec `json:"s3"`
 }
 
 // GetNameWithSuffix returns the name of the HiveMetastore with the provided suffix appended.
@@ -114,6 +219,9 @@ type ServiceSpec struct {
 
 type PersistenceSpec struct {
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=true
+	Enable bool `json:"enable,omitempty"`
+	// +kubebuilder:validation:Optional
 	StorageClass *string `json:"storageClass,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -146,40 +254,13 @@ func (instance *HiveMetastore) GetPvcName() string {
 // If the condition already exists, it updates the condition; otherwise, it appends the condition.
 // If the condition status has changed, it updates the condition's LastTransitionTime.
 func (r *HiveMetastore) SetStatusCondition(condition metav1.Condition) {
-	// if the condition already exists, update it
-	existingCondition := apimeta.FindStatusCondition(r.Status.Conditions, condition.Type)
-	if existingCondition == nil {
-		condition.ObservedGeneration = r.GetGeneration()
-		condition.LastTransitionTime = metav1.Now()
-		r.Status.Conditions = append(r.Status.Conditions, condition)
-	} else if existingCondition.Status != condition.Status || existingCondition.Reason != condition.Reason || existingCondition.Message != condition.Message {
-		existingCondition.Status = condition.Status
-		existingCondition.Reason = condition.Reason
-		existingCondition.Message = condition.Message
-		existingCondition.ObservedGeneration = r.GetGeneration()
-		existingCondition.LastTransitionTime = metav1.Now()
-	}
+	r.Status.SetStatusCondition(condition)
 }
 
 // InitStatusConditions initializes the status conditions to the provided conditions.
 func (r *HiveMetastore) InitStatusConditions() {
-	r.Status.Conditions = []metav1.Condition{}
-	r.SetStatusCondition(metav1.Condition{
-		Type:               ConditionTypeProgressing,
-		Status:             metav1.ConditionTrue,
-		Reason:             ConditionReasonPreparing,
-		Message:            "HiveMetastore is preparing",
-		ObservedGeneration: r.GetGeneration(),
-		LastTransitionTime: metav1.Now(),
-	})
-	r.SetStatusCondition(metav1.Condition{
-		Type:               ConditionTypeAvailable,
-		Status:             metav1.ConditionFalse,
-		Reason:             ConditionReasonPreparing,
-		Message:            "HiveMetastore is preparing",
-		ObservedGeneration: r.GetGeneration(),
-		LastTransitionTime: metav1.Now(),
-	})
+	r.Status.InitStatus(r)
+	r.Status.InitStatusConditions()
 }
 
 // HiveMetastoreStatus defines the observed state of HiveMetastore
@@ -196,8 +277,8 @@ type HiveMetastore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   HiveMetastoreSpec   `json:"spec,omitempty"`
-	Status HiveMetastoreStatus `json:"status,omitempty"`
+	Spec   HiveMetastoreSpec `json:"spec,omitempty"`
+	Status status.Status     `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true

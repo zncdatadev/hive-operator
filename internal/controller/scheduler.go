@@ -7,14 +7,32 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CreateScheduler(instance *stackv1alpha1.HiveMetastore, dep *appsv1.Deployment) {
+// CreateScheduler todo: refactor
+func CreateScheduler(instance *stackv1alpha1.HiveMetastore, dep *appsv1.Deployment, roleGroup *stackv1alpha1.RoleGroupSpec) {
 
-	if instance.Spec.NodeSelector != nil {
-		dep.Spec.Template.Spec.NodeSelector = instance.Spec.NodeSelector
+	var (
+		nodeSelector = instance.Spec.NodeSelector
+		tolerations  = instance.Spec.Tolerations
+		affinity     = instance.Spec.Affinity
+	)
+	if roleGroup != nil && roleGroup.Config != nil {
+		if rgNodeSelector := roleGroup.Config.NodeSelector; rgNodeSelector != nil {
+			nodeSelector = rgNodeSelector
+		}
+		if rgTolerations := roleGroup.Config.Tolerations; rgTolerations != nil {
+			tolerations = rgTolerations
+		}
+		if rgAffinity := roleGroup.Config.Affinity; rgAffinity != nil {
+			affinity = rgAffinity
+		}
 	}
 
-	if instance.Spec.Tolerations != nil {
-		toleration := *instance.Spec.Tolerations
+	if nodeSelector != nil {
+		dep.Spec.Template.Spec.NodeSelector = nodeSelector
+	}
+
+	if tolerations != nil {
+		toleration := *tolerations
 
 		dep.Spec.Template.Spec.Tolerations = []corev1.Toleration{
 			{
@@ -27,16 +45,15 @@ func CreateScheduler(instance *stackv1alpha1.HiveMetastore, dep *appsv1.Deployme
 		}
 	}
 
-	if instance.Spec.Affinity != nil {
+	if affinity != nil {
 		dep.Spec.Template.Spec.Affinity = &corev1.Affinity{}
-		if instance.Spec.Affinity.NodeAffinity != nil {
+		if affinity != nil {
 			dep.Spec.Template.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
-			if instance.Spec.Affinity != nil && instance.Spec.Affinity.NodeAffinity != nil &&
-				instance.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+			if affinity != nil && affinity.NodeAffinity != nil &&
+				affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+				requiredTerms := make([]corev1.NodeSelectorTerm, len(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms))
 
-				requiredTerms := make([]corev1.NodeSelectorTerm, len(instance.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms))
-
-				for i, term := range instance.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+				for i, term := range affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
 					requiredTerms[i] = corev1.NodeSelectorTerm{
 						MatchExpressions: []corev1.NodeSelectorRequirement{
 							{
@@ -57,10 +74,10 @@ func CreateScheduler(instance *stackv1alpha1.HiveMetastore, dep *appsv1.Deployme
 				}
 			}
 
-			if instance.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+			if affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
 				preferredTerms := []corev1.PreferredSchedulingTerm{}
 
-				for _, term := range instance.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+				for _, term := range affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
 					preferredTerm := corev1.PreferredSchedulingTerm{
 						Weight: term.Weight,
 						Preference: corev1.NodeSelectorTerm{
@@ -81,12 +98,12 @@ func CreateScheduler(instance *stackv1alpha1.HiveMetastore, dep *appsv1.Deployme
 			}
 		}
 
-		if instance.Spec.Affinity.PodAffinity != nil {
+		if affinity.PodAffinity != nil {
 			dep.Spec.Template.Spec.Affinity.PodAffinity = &corev1.PodAffinity{}
-			if instance.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+			if affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 				requiredTerms := []corev1.PodAffinityTerm{}
 
-				for _, term := range instance.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+				for _, term := range affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
 					requiredTerm := corev1.PodAffinityTerm{
 						Namespaces:        term.Namespaces,
 						TopologyKey:       term.TopologyKey,
@@ -108,10 +125,10 @@ func CreateScheduler(instance *stackv1alpha1.HiveMetastore, dep *appsv1.Deployme
 				dep.Spec.Template.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution = requiredTerms
 			}
 
-			if instance.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+			if affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
 				preferredTerms := []corev1.WeightedPodAffinityTerm{}
 
-				for _, term := range instance.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+				for _, term := range affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
 					preferredTerm := corev1.WeightedPodAffinityTerm{
 						Weight: term.Weight,
 						PodAffinityTerm: corev1.PodAffinityTerm{
@@ -137,12 +154,12 @@ func CreateScheduler(instance *stackv1alpha1.HiveMetastore, dep *appsv1.Deployme
 			}
 		}
 
-		if instance.Spec.Affinity.PodAntiAffinity != nil {
+		if affinity.PodAntiAffinity != nil {
 			dep.Spec.Template.Spec.Affinity.PodAntiAffinity = &corev1.PodAntiAffinity{}
-			if instance.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+			if affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 				requiredTerms := []corev1.PodAffinityTerm{}
 
-				for _, term := range instance.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+				for _, term := range affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
 					requiredTerm := corev1.PodAffinityTerm{
 						Namespaces:        term.Namespaces,
 						TopologyKey:       term.TopologyKey,
@@ -164,10 +181,10 @@ func CreateScheduler(instance *stackv1alpha1.HiveMetastore, dep *appsv1.Deployme
 				dep.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = requiredTerms
 			}
 
-			if instance.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+			if affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
 				preferredTerms := []corev1.WeightedPodAffinityTerm{}
 
-				for _, term := range instance.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+				for _, term := range affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
 					preferredTerm := corev1.WeightedPodAffinityTerm{
 						Weight: term.Weight,
 						PodAffinityTerm: corev1.PodAffinityTerm{

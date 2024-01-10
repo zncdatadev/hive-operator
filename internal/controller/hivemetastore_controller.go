@@ -20,6 +20,8 @@ import (
 	"context"
 	"github.com/go-logr/logr"
 	stackv1alpha1 "github.com/zncdata-labs/hive-metastore-operator/api/v1alpha1"
+	"github.com/zncdata-labs/operator-go/pkg/status"
+	"github.com/zncdata-labs/operator-go/pkg/util"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -71,41 +73,54 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	//// Get the status condition, if it exists and its generation is not the
 	////same as the HiveMetastore's generation, reset the status conditions
-	readCondition := apimeta.FindStatusCondition(hiveMetastore.Status.Conditions, stackv1alpha1.ConditionTypeProgressing)
+	readCondition := apimeta.FindStatusCondition(hiveMetastore.Status.Conditions, status.ConditionTypeProgressing)
 	if readCondition == nil || readCondition.ObservedGeneration != hiveMetastore.GetGeneration() {
 		hiveMetastore.InitStatusConditions()
 
-		if err := r.UpdateStatus(ctx, hiveMetastore); err != nil {
+		if err := utils.UpdateStatus(ctx, r.Client, hiveMetastore); err != nil {
+			r.Log.Error(err, "unable to update HiveMetastoreServer status")
 			return ctrl.Result{}, err
 		}
 	}
-  
+
 	r.Log.Info("HiveMetastore found", "Name", hiveMetastore.Name)
 
-	if err := r.reconcileDeployment(ctx, hiveMetastore); err != nil {
-		r.Log.Error(err, "unable to reconcile Deployment")
-		return ctrl.Result{}, err
+	tasks := []ReconcileTask{
+		{
+			resourceName:  Pvc,
+			reconcileFunc: r.reconcilePvc,
+		},
+		{
+			resourceName:  ConfigMap,
+			reconcileFunc: r.reconcileConfigMap,
+		},
+		{
+			resourceName:  Secret,
+			reconcileFunc: r.reconcileSecret,
+		},
+		{
+			resourceName:  Deployment,
+			reconcileFunc: r.reconcileDeployment,
+		}, {
+			resourceName:  Service,
+			reconcileFunc: r.reconcileService,
+		},
 	}
 
-	if err := r.reconcileService(ctx, hiveMetastore); err != nil {
-		r.Log.Error(err, "unable to reconcile Service")
-		return ctrl.Result{}, err
-	}
-
-	if err := r.reconcileSecret(ctx, hiveMetastore); err != nil {
-		r.Log.Error(err, "unable to reconcile Secret")
+	if err := ReconcileTasks(&tasks, ctx, hiveMetastore, r, "hiveMetaStore"); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	hiveMetastore.SetStatusCondition(metav1.Condition{
-		Type:               stackv1alpha1.ConditionTypeAvailable,
+		Type:               status.ConditionTypeAvailable,
 		Status:             metav1.ConditionTrue,
-		Reason:             stackv1alpha1.ConditionReasonRunning,
+		Reason:             status.ConditionReasonRunning,
 		Message:            "HiveMetastore is running",
 		ObservedGeneration: hiveMetastore.GetGeneration(),
 	})
 
-	if err := r.UpdateStatus(ctx, hiveMetastore); err != nil {
+	if err := utils.UpdateStatus(ctx, r.Client, hiveMetastore); err != nil {
+		r.Log.Error(err, "unable to update SparkHistoryServer status")
 		return ctrl.Result{}, err
 	}
 

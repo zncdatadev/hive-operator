@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/created-by: hive-metastore-operator
   name: hivemetastore-sample
 spec:
-  replicas: 1
+  replicas: 2
   service:
     port: 9083
     type: ClusterIP
@@ -21,12 +21,33 @@ spec:
     requests:
       cpu: 100m
       memory: 512Mi
-  postgres:
-    host: postgresql.default.svc
-    port: "5432"
-    username: hive
-    password: "12345678"
-    database: metastore
+  roleConfig:
+    postgres:
+      host: postgresql.default.svc
+      port: "5432"
+      username: hive
+      password: "12345678"
+      database: metastore
+#    s3:
+  roleGroups:
+    default:
+      replicas: 1
+      config:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+        matchLabels:
+          app: foo
+    foo:
+      replicas: 1
+      config:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        matchLabels:
+          app: foo
   securityContext:
     runAsUser: 1000
     fsGroup: 1000
