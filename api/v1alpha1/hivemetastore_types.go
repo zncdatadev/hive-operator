@@ -17,8 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/zncdata-labs/operator-go/pkg/status"
 	corev1 "k8s.io/api/core/v1"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,6 +27,7 @@ import (
 
 // HiveMetastoreSpec defines the desired state of HiveMetastore
 type HiveMetastoreSpec struct {
+	// +kubebuilder:validation:Required
 	Image ImageSpec `json:"image,omitempty"`
 
 	// +kubebuilder:validation=Optional
@@ -43,7 +44,7 @@ type HiveMetastoreSpec struct {
 	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Service *ServiceSpec `json:"service,omitempty"`
+	Service ServiceSpec `json:"service,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
@@ -55,33 +56,12 @@ type HiveMetastoreSpec struct {
 	Tolerations *corev1.Toleration `json:"tolerations,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Persistence *PersistenceSpec `json:"persistence,omitempty"`
-
-	// +kubebuilder:validation:Optional
 	PostgresSecret *PostgresSecretSpec `json:"postgres,omitempty"`
 }
 
 // GetNameWithSuffix returns the name of the HiveMetastore with the provided suffix appended.
 func (instance *HiveMetastore) GetNameWithSuffix(name string) string {
 	return instance.GetName() + "-" + name
-}
-
-type PostgresSecretSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="postgresql"
-	Host string `json:"host,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="5432"
-	Port string `json:"port"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="hive"
-	UserName string `json:"username"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="12345678"
-	Password string `json:"password"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="hive"
-	DataBase string `json:"database"`
 }
 
 type ImageSpec struct {
@@ -112,29 +92,22 @@ type ServiceSpec struct {
 	Port int32 `json:"port,omitempty"`
 }
 
-type PersistenceSpec struct {
+type PostgresSecretSpec struct {
 	// +kubebuilder:validation:Optional
-	StorageClass *string `json:"storageClass,omitempty"`
-
+	// +kubebuilder:default:="postgresql"
+	Host string `json:"host,omitempty"`
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ReadWriteOnce}
-	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
-
-	// +kubebuilder:default="10Gi"
-	Size string `json:"size,omitempty"`
-
+	// +kubebuilder:default="5432"
+	Port string `json:"port"`
 	// +kubebuilder:validation:Optional
-	ExistingClaim *string `json:"existingClaim,omitempty"`
-
+	// +kubebuilder:default="hive"
+	UserName string `json:"username"`
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=Filesystem
-	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty"`
-
+	// +kubebuilder:default="12345678"
+	Password string `json:"password"`
 	// +kubebuilder:validation:Optional
-	Labels map[string]string `json:"labels,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Annotations map[string]string `json:"annotations,omitempty"`
+	// +kubebuilder:default="hive"
+	DataBase string `json:"database"`
 }
 
 // GetPvcName returns the name of the PVC for the HiveMetastore.
@@ -146,40 +119,13 @@ func (instance *HiveMetastore) GetPvcName() string {
 // If the condition already exists, it updates the condition; otherwise, it appends the condition.
 // If the condition status has changed, it updates the condition's LastTransitionTime.
 func (r *HiveMetastore) SetStatusCondition(condition metav1.Condition) {
-	// if the condition already exists, update it
-	existingCondition := apimeta.FindStatusCondition(r.Status.Conditions, condition.Type)
-	if existingCondition == nil {
-		condition.ObservedGeneration = r.GetGeneration()
-		condition.LastTransitionTime = metav1.Now()
-		r.Status.Conditions = append(r.Status.Conditions, condition)
-	} else if existingCondition.Status != condition.Status || existingCondition.Reason != condition.Reason || existingCondition.Message != condition.Message {
-		existingCondition.Status = condition.Status
-		existingCondition.Reason = condition.Reason
-		existingCondition.Message = condition.Message
-		existingCondition.ObservedGeneration = r.GetGeneration()
-		existingCondition.LastTransitionTime = metav1.Now()
-	}
+	r.Status.SetStatusCondition(condition)
 }
 
 // InitStatusConditions initializes the status conditions to the provided conditions.
 func (r *HiveMetastore) InitStatusConditions() {
-	r.Status.Conditions = []metav1.Condition{}
-	r.SetStatusCondition(metav1.Condition{
-		Type:               ConditionTypeProgressing,
-		Status:             metav1.ConditionTrue,
-		Reason:             ConditionReasonPreparing,
-		Message:            "HiveMetastore is preparing",
-		ObservedGeneration: r.GetGeneration(),
-		LastTransitionTime: metav1.Now(),
-	})
-	r.SetStatusCondition(metav1.Condition{
-		Type:               ConditionTypeAvailable,
-		Status:             metav1.ConditionFalse,
-		Reason:             ConditionReasonPreparing,
-		Message:            "HiveMetastore is preparing",
-		ObservedGeneration: r.GetGeneration(),
-		LastTransitionTime: metav1.Now(),
-	})
+	r.Status.InitStatus(r)
+	r.Status.InitStatusConditions()
 }
 
 // HiveMetastoreStatus defines the observed state of HiveMetastore
@@ -196,8 +142,8 @@ type HiveMetastore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   HiveMetastoreSpec   `json:"spec,omitempty"`
-	Status HiveMetastoreStatus `json:"status,omitempty"`
+	Spec   HiveMetastoreSpec `json:"spec,omitempty"`
+	Status status.Status     `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
