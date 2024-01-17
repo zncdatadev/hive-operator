@@ -135,7 +135,7 @@ func getStructType(struc interface{}) reflect.Type {
 	return sType
 }
 
-func extractDecodeData(data *map[string][]byte, key string) (*string, error) {
+func DecodeBase64Data(data *map[string][]byte, key string) (*string, error) {
 	obj := *data
 	if usernameByte, ok := obj[key]; ok {
 		if decodedUsr, err := base64.StdEncoding.DecodeString(string(usernameByte)); err != nil {

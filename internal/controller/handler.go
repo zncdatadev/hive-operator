@@ -478,6 +478,9 @@ func (r *HiveMetastoreReconciler) extractDeploymentForRoleGroup(instance *stackv
 			},
 		},
 	}
+
+	CreateScheduler(instance, dep, roleGroup)
+
 	err = ctrl.SetControllerReference(instance, dep, schema)
 	if err != nil {
 		r.Log.Error(err, "Failed to set controller reference for deployment")
@@ -546,7 +549,8 @@ func (r *HiveMetastoreReconciler) extractSecretForRoleGroup(instance *stackv1alp
 		}
 	}
 	if dbrsc == nil {
-		return nil, errors.New(fmt.Sprintf("Role-group: %s should set a database config in role-group-config, role-config or cluster-config"))
+		return nil, errors.New(fmt.Sprintf("Role-group: %s should set a database config in role-group-config, "+
+			"role-config or cluster-config", roleGroupName))
 	}
 
 	data := make(map[string][]byte)
@@ -584,12 +588,12 @@ func (r *HiveMetastoreReconciler) makeDatabaseData(dbrsc *opgo.Database, dbColle
 			}
 			credentialByteData := &existCredentialSecret.Data
 			var username, passwd string
-			if usr, err := extractDecodeData(credentialByteData, "username"); err != nil {
+			if usr, err := DecodeBase64Data(credentialByteData, "username"); err != nil {
 				return nil, err
 			} else {
 				username = *usr
 			}
-			if pass, err := extractDecodeData(credentialByteData, "password"); err != nil {
+			if pass, err := DecodeBase64Data(credentialByteData, "password"); err != nil {
 				return nil, err
 			} else {
 				passwd = *pass
