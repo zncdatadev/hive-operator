@@ -22,6 +22,52 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// HiveMetastore is the Schema for the hivemetastores API
+type HiveMetastore struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   HiveMetastoreSpec `json:"spec,omitempty"`
+	Status status.Status     `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+type HiveMetastoreList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []HiveMetastore `json:"items"`
+}
+
+type ImageSpec struct {
+	// +kubebuilder:validation=Optional
+	// +kubebuilder:default=docker.io/apache/hive-metastore
+	Repository string `json:"repository,omitempty"`
+
+	// +kubebuilder:validation=Optional
+	// +kubebuilder:default=latest
+	Tag string `json:"tag,omitempty"`
+
+	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
+	// +kubebuilder:default=IfNotPresent
+	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
+}
+
+type ServiceSpec struct {
+	// +kubebuilder:validation:Optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// +kubebuilder:validation:enum=ClusterIP;NodePort;LoadBalancer;ExternalName
+	// +kubebuilder:default=ClusterIP
+	Type corev1.ServiceType `json:"type,omitempty"`
+
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:default=9083
+	Port int32 `json:"port,omitempty"`
+}
+
 // HiveMetastoreSpec defines the desired state of HiveMetastore
 type HiveMetastoreSpec struct {
 	Image ImageSpec `json:"image,omitempty"`
@@ -82,6 +128,12 @@ type RoleConfigSpec struct {
 	Config *ConfigSpec `json:"config"`
 }
 
+// HiveMetastoreStatus defines the observed state of HiveMetastore
+type HiveMetastoreStatus struct {
+	// +kubebuilder:validation:Optional
+	Conditions []metav1.Condition `json:"condition,omitempty"`
+}
+
 type ConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	Resources *corev1.ResourceRequirements `json:"resources"`
@@ -99,9 +151,11 @@ type DatabaseSpec struct {
 
 type S3Spec struct {
 	S3BucketSpec `json:"bucket"`
+
 	// +kubebuilder:validation=Optional
 	// +kubebuilder:default=20
 	MaxConnect int `json:"maxConnect"`
+
 	// +kubebuilder:validation=Optional
 	PathStyleAccess bool `json:"pathStyle_access"`
 }
@@ -110,38 +164,13 @@ type S3BucketSpec struct {
 	Reference string `json:"reference"`
 }
 
+func init() {
+	SchemeBuilder.Register(&HiveMetastore{}, &HiveMetastoreList{})
+}
+
 // GetNameWithSuffix returns the name of the HiveMetastore with the provided suffix appended.
 func (instance *HiveMetastore) GetNameWithSuffix(name string) string {
 	return instance.GetName() + "-" + name
-}
-
-type ImageSpec struct {
-
-	// +kubebuilder:validation=Optional
-	// +kubebuilder:default=docker.io/apache/hive-metastore
-	Repository string `json:"repository,omitempty"`
-
-	// +kubebuilder:validation=Optional
-	// +kubebuilder:default=latest
-	Tag string `json:"tag,omitempty"`
-
-	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
-	// +kubebuilder:default=IfNotPresent
-	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
-}
-
-type ServiceSpec struct {
-	// +kubebuilder:validation:Optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// +kubebuilder:validation:enum=ClusterIP;NodePort;LoadBalancer;ExternalName
-	// +kubebuilder:default=ClusterIP
-	Type corev1.ServiceType `json:"type,omitempty"`
-
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:default=9083
-	Port int32 `json:"port,omitempty"`
 }
 
 // GetPvcName returns the name of the PVC for the HiveMetastore.
@@ -160,32 +189,4 @@ func (r *HiveMetastore) SetStatusCondition(condition metav1.Condition) {
 func (r *HiveMetastore) InitStatusConditions() {
 	r.Status.InitStatus(r)
 	r.Status.InitStatusConditions()
-}
-
-// HiveMetastoreStatus defines the observed state of HiveMetastore
-type HiveMetastoreStatus struct {
-	// +kubebuilder:validation:Optional
-	Conditions []metav1.Condition `json:"condition,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
-// HiveMetastore is the Schema for the hivemetastores API
-type HiveMetastore struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   HiveMetastoreSpec `json:"spec,omitempty"`
-	Status status.Status     `json:"status,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-type HiveMetastoreList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []HiveMetastore `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&HiveMetastore{}, &HiveMetastoreList{})
 }
