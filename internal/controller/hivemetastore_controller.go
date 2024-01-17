@@ -23,7 +23,6 @@ import (
 	"github.com/zncdata-labs/operator-go/pkg/status"
 	"github.com/zncdata-labs/operator-go/pkg/util"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -103,14 +102,6 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err := ReconcileTasks(&tasks, ctx, hiveMetastore, r, "hiveMetaStore"); err != nil {
 		return ctrl.Result{}, err
 	}
-
-	hiveMetastore.SetStatusCondition(metav1.Condition{
-		Type:               status.ConditionTypeAvailable,
-		Status:             metav1.ConditionTrue,
-		Reason:             status.ConditionReasonRunning,
-		Message:            "HiveMetastore is running",
-		ObservedGeneration: hiveMetastore.GetGeneration(),
-	})
 
 	if err := util.UpdateStatus(ctx, r.Client, hiveMetastore); err != nil {
 		r.Log.Error(err, "unable to update SparkHistoryServer status")
