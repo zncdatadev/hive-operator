@@ -78,12 +78,6 @@ type HiveMetastoreSpec struct {
 	// +kubebuilder:validation:Optional
 	RoleGroups map[string]*RoleConfigSpec `json:"roleGroups"`
 
-	// +kubebuilder:validation:Required
-	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
-
-	// +kubebuilder:validation:Optional
-	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
-
 	// +kubebuilder:validation:Optional
 	Service *ServiceSpec `json:"service,omitempty"`
 }

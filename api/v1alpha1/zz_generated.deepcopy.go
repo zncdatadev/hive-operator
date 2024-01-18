@@ -155,16 +155,6 @@ func (in *HiveMetastoreSpec) DeepCopyInto(out *HiveMetastoreSpec) {
 			(*out)[key] = outVal
 		}
 	}
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(v1.PodSecurityContext)
-		(*in).DeepCopyInto(*out)
-	}
-	if in.PodSecurityContext != nil {
-		in, out := &in.PodSecurityContext, &out.PodSecurityContext
-		*out = new(v1.PodSecurityContext)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.Service != nil {
 		in, out := &in.Service, &out.Service
 		*out = new(ServiceSpec)
