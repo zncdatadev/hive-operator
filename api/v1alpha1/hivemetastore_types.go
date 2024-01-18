@@ -22,50 +22,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// HiveMetastore is the Schema for the hivemetastores API
+type HiveMetastore struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-// HiveMetastoreSpec defines the desired state of HiveMetastore
-type HiveMetastoreSpec struct {
-	// +kubebuilder:validation:Required
-	Image ImageSpec `json:"image,omitempty"`
-
-	// +kubebuilder:validation=Optional
-	// +kubebuilder:default=1
-	Replicas int32 `json:"replicas,omitempty"`
-
-	// +kubebuilder:validation:Required
-	Resources *corev1.ResourceRequirements `json:"resources"`
-
-	// +kubebuilder:validation:Required
-	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
-
-	// +kubebuilder:validation:Optional
-	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Service ServiceSpec `json:"service,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Affinity *corev1.Affinity `json:"affinity"`
-
-	// +kubebuilder:validation:Optional
-	Tolerations *corev1.Toleration `json:"tolerations,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	PostgresSecret *PostgresSecretSpec `json:"postgres,omitempty"`
+	Spec   HiveMetastoreSpec `json:"spec,omitempty"`
+	Status status.Status     `json:"status,omitempty"`
 }
 
-// GetNameWithSuffix returns the name of the HiveMetastore with the provided suffix appended.
-func (instance *HiveMetastore) GetNameWithSuffix(name string) string {
-	return instance.GetName() + "-" + name
+// +kubebuilder:object:root=true
+type HiveMetastoreList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []HiveMetastore `json:"items"`
 }
 
 type ImageSpec struct {
-
 	// +kubebuilder:validation=Optional
 	// +kubebuilder:default=docker.io/apache/hive-metastore
 	Repository string `json:"repository,omitempty"`
@@ -82,6 +57,7 @@ type ImageSpec struct {
 type ServiceSpec struct {
 	// +kubebuilder:validation:Optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// +kubebuilder:validation:enum=ClusterIP;NodePort;LoadBalancer;ExternalName
 	// +kubebuilder:default=ClusterIP
 	Type corev1.ServiceType `json:"type,omitempty"`
@@ -92,40 +68,64 @@ type ServiceSpec struct {
 	Port int32 `json:"port,omitempty"`
 }
 
-type PostgresSecretSpec struct {
+// HiveMetastoreSpec defines the desired state of HiveMetastore
+type HiveMetastoreSpec struct {
+	Image ImageSpec `json:"image,omitempty"`
+
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="postgresql"
-	Host string `json:"host,omitempty"`
+	RoleConfig *RoleConfigSpec `json:"roleConfig"`
+
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="5432"
-	Port string `json:"port"`
+	RoleGroups map[string]*RoleConfigSpec `json:"roleGroups"`
+
+	// +kubebuilder:validation:Required
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
+
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="hive"
-	UserName string `json:"username"`
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="12345678"
-	Password string `json:"password"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="hive"
-	DataBase string `json:"database"`
+	Service *ServiceSpec `json:"service,omitempty"`
 }
 
-// GetPvcName returns the name of the PVC for the HiveMetastore.
-func (instance *HiveMetastore) GetPvcName() string {
-	return instance.GetNameWithSuffix("pvc")
-}
+type RoleConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=1
+	Replicas int32 `json:"replicas"`
 
-// SetStatusCondition updates the status condition using the provided arguments.
-// If the condition already exists, it updates the condition; otherwise, it appends the condition.
-// If the condition status has changed, it updates the condition's LastTransitionTime.
-func (r *HiveMetastore) SetStatusCondition(condition metav1.Condition) {
-	r.Status.SetStatusCondition(condition)
-}
+	// +kubebuilder:validation:Optional
+	Image *ImageSpec `json:"image"`
 
-// InitStatusConditions initializes the status conditions to the provided conditions.
-func (r *HiveMetastore) InitStatusConditions() {
-	r.Status.InitStatus(r)
-	r.Status.InitStatusConditions()
+	// +kubebuilder:validation:Optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
+
+	// +kubebuilder:validation:Optional
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Affinity *corev1.Affinity `json:"affinity"`
+
+	// +kubebuilder:validation:Optional
+	NodeSelector map[string]string `json:"nodeSelector"`
+
+	// +kubebuilder:validation:Optional
+	Tolerations *corev1.Toleration `json:"tolerations"`
+
+	// +kubebuilder:validation:Optional
+	Service *ServiceSpec `json:"service"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="/opt/hive/data"
+	WarehouseDir string `json:"warehouseDir"`
+
+	// +kubebuilder:validation:Optional
+	StorageClass *string `json:"storageClass,omitempty"`
+
+	// +kubebuilder:default="10Gi"
+	StorageSize string `json:"size,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Config *ConfigSpec `json:"config"`
 }
 
 // HiveMetastoreStatus defines the observed state of HiveMetastore
@@ -134,27 +134,52 @@ type HiveMetastoreStatus struct {
 	Conditions []metav1.Condition `json:"condition,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+type ConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	Resources *corev1.ResourceRequirements `json:"resources"`
 
-// HiveMetastore is the Schema for the hivemetastores API
-type HiveMetastore struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// +kubebuilder:validation:Optional
+	Database *DatabaseSpec `json:"database,omitempty"`
 
-	Spec   HiveMetastoreSpec `json:"spec,omitempty"`
-	Status status.Status     `json:"status,omitempty"`
+	// +kubebuilder:validation:Optional
+	S3 *S3Spec `json:"s3"`
 }
 
-//+kubebuilder:object:root=true
+type DatabaseSpec struct {
+	Reference string `json:"reference"`
+}
 
-// HiveMetastoreList contains a list of HiveMetastore
-type HiveMetastoreList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []HiveMetastore `json:"items"`
+type S3Spec struct {
+	S3BucketSpec `json:"bucket"`
+
+	// +kubebuilder:validation=Optional
+	// +kubebuilder:default=20
+	MaxConnect int `json:"maxConnect"`
+
+	// +kubebuilder:validation=Optional
+	PathStyleAccess bool `json:"pathStyle_access"`
+}
+
+type S3BucketSpec struct {
+	Reference string `json:"reference"`
 }
 
 func init() {
 	SchemeBuilder.Register(&HiveMetastore{}, &HiveMetastoreList{})
+}
+
+// GetNameWithSuffix returns the name of the HiveMetastore with the provided suffix appended.
+func (instance *HiveMetastore) GetNameWithSuffix(name string) string {
+	return instance.GetName() + "-" + name
+}
+
+// GetPvcName returns the name of the PVC for the HiveMetastore.
+func (instance *HiveMetastore) GetPvcName() string {
+	return instance.GetNameWithSuffix("pvc")
+}
+
+// InitStatusConditions initializes the status conditions to the provided conditions.
+func (r *HiveMetastore) InitStatusConditions() {
+	r.Status.InitStatus(r)
+	r.Status.InitStatusConditions()
 }

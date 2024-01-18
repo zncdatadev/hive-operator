@@ -185,3 +185,9 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+.vscode
+
+# operator
+bundle
+bundle.Dockerfile
