@@ -50,6 +50,6 @@ spec:
             memory: 256Mi
       matchLabels:
         app: foo
-  securityContext:
-    runAsUser: 1000
-    fsGroup: 1000
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000

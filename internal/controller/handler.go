@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 )
 
 // Resource todo for dep, svc and so on
@@ -107,7 +108,42 @@ func (r *HiveMetastoreReconciler) reconcilePvc(ctx context.Context, instance *st
 	return nil
 }
 
-func (r *HiveMetastoreReconciler) extractPvcForRoleGroup(instance *stackv1alpha1.HiveMetastore, _ context.Context,
+func (r *HiveMetastoreReconciler) makePv(ctx context.Context, instance *stackv1alpha1.HiveMetastore,
+	mergeLabels map[string]string, groupName string, storageClassName *string, storageSize string,
+	warehouseDir string, volumeMode *corev1.PersistentVolumeMode) error {
+	className := ""
+	if storageClassName != nil {
+		className = *storageClassName
+	}
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      instance.GetNameWithSuffix(groupName),
+			Namespace: instance.Namespace,
+			Labels:    mergeLabels,
+		},
+		Spec: corev1.PersistentVolumeSpec{
+			Capacity: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse(storageSize),
+			},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: warehouseDir,
+				},
+			},
+			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			StorageClassName: className,
+			VolumeMode:       volumeMode,
+		},
+	}
+	if err := CreateOrUpdate(ctx, r.Client, pv); err != nil {
+		r.Log.Error(err, "Failed to create or update Resource", "resource", pv)
+		return err
+	}
+	return nil
+}
+
+// when s3 exists, need not make pvc; otherwise, need to make pv and pvc using `warehouseDir`
+func (r *HiveMetastoreReconciler) extractPvcForRoleGroup(instance *stackv1alpha1.HiveMetastore, ctx context.Context,
 	groupName string, roleGroup *stackv1alpha1.RoleConfigSpec, scheme *runtime.Scheme) (*client.Object, error) {
 
 	var mergeLabels Map
@@ -117,6 +153,8 @@ func (r *HiveMetastoreReconciler) extractPvcForRoleGroup(instance *stackv1alpha1
 		storageClassName = instance.Spec.RoleConfig.StorageClass
 		storageSize      = instance.Spec.RoleConfig.StorageSize
 		volumeMode       = corev1.PersistentVolumeFilesystem
+		s3               = instance.Spec.RoleConfig.Config.S3
+		warehouseDir     = instance.Spec.RoleConfig.WarehouseDir
 	)
 	if roleGroup != nil {
 		if rgStorageClass := roleGroup.StorageClass; rgStorageClass != nil {
@@ -125,8 +163,21 @@ func (r *HiveMetastoreReconciler) extractPvcForRoleGroup(instance *stackv1alpha1
 		if rgStorageSize := roleGroup.StorageSize; rgStorageSize != "" {
 			storageSize = rgStorageSize
 		}
+		if rgWarehouseDir := roleGroup.WarehouseDir; rgWarehouseDir != "" {
+			warehouseDir = rgWarehouseDir
+		}
+		if rgs3 := roleGroup.Config.S3; rgs3 != nil {
+			s3 = rgs3
+		}
 	}
-
+	// when s3 exist for role-group, need not reconcile pvc
+	if s3 != nil {
+		return nil, nil
+	}
+	if strings.HasPrefix(warehouseDir, "s://") {
+		return nil, errors.Errorf("Warehouse-dir is:[%s], expect config s3 config, but is nil, role-group:%s",
+			warehouseDir, groupName)
+	}
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.GetNameWithSuffix(groupName),
@@ -142,6 +193,7 @@ func (r *HiveMetastoreReconciler) extractPvcForRoleGroup(instance *stackv1alpha1
 				},
 			},
 			VolumeMode: &volumeMode,
+			//VolumeName: instance.GetNameWithSuffix(groupName),
 		},
 	}
 
@@ -152,7 +204,6 @@ func (r *HiveMetastoreReconciler) extractPvcForRoleGroup(instance *stackv1alpha1
 	}
 	pvcEx := client.Object(pvc)
 	return &pvcEx, nil
-
 }
 
 func (r *HiveMetastoreReconciler) reconcileService(ctx context.Context, instance *stackv1alpha1.HiveMetastore) error {
@@ -214,15 +265,15 @@ func (r *HiveMetastoreReconciler) fetchS3(s3Bucket *opgo.S3Bucket, ctx context.C
 	if err := r.fetchResource(ctx, cliObj, instance); err != nil {
 		return nil, err
 	}
-	//2 - fetch exist s3-collection by pre-fetch bucketName
-	s3Collection := &opgo.S3Connection{
+	//2 - fetch exist s3-connection by pre-fetch bucketName
+	s3Connection := &opgo.S3Connection{
 		ObjectMeta: metav1.ObjectMeta{Name: s3Bucket.Spec.Reference},
 	}
-	collCliObj := client.Object(s3Collection)
+	collCliObj := client.Object(s3Connection)
 	if err := r.fetchResource(ctx, collCliObj, instance); err != nil {
 		return nil, err
 	}
-	return s3Collection, nil
+	return s3Connection, nil
 }
 
 func (r *HiveMetastoreReconciler) fetchDb(database *opgo.Database, ctx context.Context,
@@ -232,15 +283,15 @@ func (r *HiveMetastoreReconciler) fetchDb(database *opgo.Database, ctx context.C
 	if err := r.fetchResource(ctx, cliObj, instance); err != nil {
 		return nil, err
 	}
-	//2 - fetch exist database collection by pre-fetch 'database.spec.name'
-	dbCollection := &opgo.DatabaseConnection{
-		ObjectMeta: metav1.ObjectMeta{Name: database.Spec.DatabaseName},
+	//2 - fetch exist database connection by pre-fetch 'database.spec.name'
+	dbConnection := &opgo.DatabaseConnection{
+		ObjectMeta: metav1.ObjectMeta{Name: database.Spec.Reference},
 	}
-	collCliObj := client.Object(dbCollection)
+	collCliObj := client.Object(dbConnection)
 	if err := r.fetchResource(ctx, collCliObj, instance); err != nil {
 		return nil, err
 	}
-	return dbCollection, nil
+	return dbConnection, nil
 }
 
 func (r *HiveMetastoreReconciler) extractConfigMapForRoleGroup(instance *stackv1alpha1.HiveMetastore, ctx context.Context,
@@ -249,63 +300,98 @@ func (r *HiveMetastoreReconciler) extractConfigMapForRoleGroup(instance *stackv1
 	r.mergeLabels(&mergeLabels, instance.GetLabels(), roleGroup)
 
 	var s3Cfg = instance.Spec.RoleConfig.Config.S3
+	var warehouseDir = instance.Spec.RoleConfig.WarehouseDir
 	if roleGroup != nil {
 		if rgCfg := roleGroup.Config; rgCfg != nil {
 			s3Cfg = rgCfg.S3
 		}
+		if rgWarehouseDir := roleGroup.WarehouseDir; rgWarehouseDir != "" {
+			warehouseDir = rgWarehouseDir
+		}
 	}
-	if s3Cfg == nil {
-		return nil, nil
+	var (
+		xmlFileTmp = "" +
+			"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
+			"<?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>\n" +
+			"<configuration>\n" +
+			"     <property>\n" +
+			"        <name>hive.metastore.warehouse.dir</name>\n" +
+			"        <value>%s</value>\n" +
+			"        <description>location of default database for the warehouse</description>\n" +
+			"    </property> \n" +
+			"</configuration>"
+		xmlBody = fmt.Sprintf(xmlFileTmp, warehouseDir)
+	)
+	if s3Cfg == nil && strings.HasPrefix(warehouseDir, "s3://") {
+		return nil, errors.Errorf("Expected s3 config in role-group:%s, but not. warehouseDir: %s",
+			roleGroupName, warehouseDir)
 	}
-	s3Bucket := &opgo.S3Bucket{
-		ObjectMeta: metav1.ObjectMeta{Name: s3Cfg.Reference},
-	}
-	s3Collection, err := r.fetchS3(s3Bucket, ctx, instance)
-	if err != nil {
-		return nil, err
+	if s3Cfg != nil {
+		xmlFileTmp = "" +
+			"	 <?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
+			"    <?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>\n" +
+			"    <configuration>\n" +
+			"		 <property>\n" +
+			"        	 <name>hive.metastore.warehouse.dir</name>\n" +
+			"         	 <value>%s</value>\n" +
+			"        </property>" +
+			"        <property>\n" +
+			"            <name>fs.s3a.connection.maximum</name>\n" +
+			"            <value>%d</value>\n" +
+			"            <description>Controls the maximum number of simultaneous connections to S3.</description>\n" +
+			"        </property>\n" +
+			"        <property>\n" +
+			"            <name>fs.s3a.connection.ssl.enabled</name>\n" +
+			"            <value>%t</value>\n" +
+			"            <description>Enables or disables SSL connections to S3.</description>\n" +
+			"        </property>\n" +
+			"        <property>\n" +
+			"            <name>fs.s3a.endpoint</name>\n" +
+			"            <value>%s</value>\n" +
+			"            <description>AWS S3 endpoint to connect to. An up-to-date list is\n" +
+			"                provided in the AWS Documentation: regions and endpoints. Without this\n" +
+			"                property, the standard region (s3.amazonaws.com) is assumed.\n" +
+			"            </description>\n" +
+			"        </property>\n" +
+			"        <property>\n" +
+			"            <name>fs.s3a.path.style.access</name>\n" +
+			"            <value>%t</value>\n" +
+			"            <description>Enable S3 path style access ie disabling the default virtual hosting behaviour.\n" +
+			"                Useful for S3A-compliant storage providers as it removes the need to set up DNS for\n" +
+			"                virtual hosting.\n" +
+			"            </description>\n" +
+			"        </property>\n" +
+			"        <property>\n" +
+			"            <name>fs.s3a.impl</name>\n" +
+			"            <value>org.apache.hadoop.fs.s3a.S3AFileSystem</value>\n" +
+			"            <description>The implementation class of the S3A Filesystem</description>\n" +
+			"        </property>\n" +
+			"        <property>\n" +
+			"            <name>fs.AbstractFileSystem.s3a.impl</name>\n" +
+			"            <value>org.apache.hadoop.fs.s3a.S3A</value>\n" +
+			"            <description>The implementation class of the S3A AbstractFileSystem.</description>\n" +
+			"        </property>\n" +
+			"    </configuration>"
+		s3Bucket := &opgo.S3Bucket{
+			ObjectMeta: metav1.ObjectMeta{Name: s3Cfg.Reference},
+		}
+		s3Connection, err := r.fetchS3(s3Bucket, ctx, instance)
+		if err != nil {
+			return nil, err
+		}
+		warehouseDir = func() string {
+			if refBucketName := s3Bucket.Spec.BucketName; refBucketName != "" {
+				warehouseDir = refBucketName
+			}
+			if !strings.HasPrefix(warehouseDir, "s3://") {
+				warehouseDir = fmt.Sprintf("s3://%s", warehouseDir)
+			}
+			return warehouseDir
+		}()
+		xmlBody = fmt.Sprintf(xmlFileTmp, warehouseDir, s3Cfg.MaxConnect, s3Connection.Spec.SSL, s3Connection.Spec.Endpoint,
+			s3Cfg.PathStyleAccess)
 	}
 
-	var xmlFileTmp = "" +
-		"	 <?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
-		"    <?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>\n" +
-		"    <configuration>\n" +
-		"        <property>\n" +
-		"            <name>fs.s3a.connection.maximum</name>\n" +
-		"            <value>%d</value>\n" +
-		"            <description>Controls the maximum number of simultaneous connections to S3.</description>\n" +
-		"        </property>\n" +
-		"        <property>\n" +
-		"            <name>fs.s3a.connection.ssl.enabled</name>\n" +
-		"            <value>%t</value>\n" +
-		"            <description>Enables or disables SSL connections to S3.</description>\n" +
-		"        </property>\n" +
-		"        <property>\n" +
-		"            <name>fs.s3a.endpoint</name>\n" +
-		"            <value>%s</value>\n" +
-		"            <description>AWS S3 endpoint to connect to. An up-to-date list is\n" +
-		"                provided in the AWS Documentation: regions and endpoints. Without this\n" +
-		"                property, the standard region (s3.amazonaws.com) is assumed.\n" +
-		"            </description>\n" +
-		"        </property>\n" +
-		"        <property>\n" +
-		"            <name>fs.s3a.path.style.access</name>\n" +
-		"            <value>%t</value>\n" +
-		"            <description>Enable S3 path style access ie disabling the default virtual hosting behaviour.\n" +
-		"                Useful for S3A-compliant storage providers as it removes the need to set up DNS for\n" +
-		"                virtual hosting.\n" +
-		"            </description>\n" +
-		"        </property>\n" +
-		"        <property>\n" +
-		"            <name>fs.s3a.impl</name>\n" +
-		"            <value>org.apache.hadoop.fs.s3a.S3AFileSystem</value>\n" +
-		"            <description>The implementation class of the S3A Filesystem</description>\n" +
-		"        </property>\n" +
-		"        <property>\n" +
-		"            <name>fs.AbstractFileSystem.s3a.impl</name>\n" +
-		"            <value>org.apache.hadoop.fs.s3a.S3A</value>\n" +
-		"            <description>The implementation class of the S3A AbstractFileSystem.</description>\n" +
-		"        </property>\n" +
-		"    </configuration>"
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.GetNameWithSuffix(roleGroupName),
@@ -313,8 +399,7 @@ func (r *HiveMetastoreReconciler) extractConfigMapForRoleGroup(instance *stackv1
 			Labels:    mergeLabels,
 		},
 		Data: map[string]string{
-			"hive-site.xml": fmt.Sprintf(xmlFileTmp, s3Cfg.MaxConnect, s3Collection.Spec.SSL, s3Collection.Spec.Endpoint,
-				s3Cfg.PathStyleAccess),
+			"hive-site.xml": xmlBody,
 		},
 	}
 
@@ -347,11 +432,11 @@ func (r *HiveMetastoreReconciler) fetchDbForRoleGroup(instance *stackv1alpha1.Hi
 	dbrsc := &opgo.Database{
 		ObjectMeta: metav1.ObjectMeta{Name: db.Reference},
 	}
-	dbCollection, err := r.fetchDb(dbrsc, ctx, instance)
+	dbConnection, err := r.fetchDb(dbrsc, ctx, instance)
 	if err != nil {
 		return nil, nil, err
 	}
-	return dbrsc, dbCollection, nil
+	return dbrsc, dbConnection, nil
 }
 
 func (r *HiveMetastoreReconciler) extractDeploymentForRoleGroup(instance *stackv1alpha1.HiveMetastore, ctx context.Context,
@@ -360,8 +445,9 @@ func (r *HiveMetastoreReconciler) extractDeploymentForRoleGroup(instance *stackv
 	r.mergeLabels(&mergeLabels, instance.GetLabels(), roleGroup)
 
 	var (
-		image       stackv1alpha1.ImageSpec
-		securityCtx *corev1.PodSecurityContext
+		image        stackv1alpha1.ImageSpec
+		securityCtx  *corev1.PodSecurityContext
+		warehouseDir string
 	)
 	if roleGroup != nil {
 		if rgImage := roleGroup.Image; rgImage != nil {
@@ -372,18 +458,21 @@ func (r *HiveMetastoreReconciler) extractDeploymentForRoleGroup(instance *stackv
 		if rgSecurityCtx := roleGroup.SecurityContext; rgSecurityCtx != nil {
 			securityCtx = rgSecurityCtx
 		} else {
-			securityCtx = instance.Spec.SecurityContext
+			securityCtx = instance.Spec.RoleConfig.SecurityContext
+		}
+		if rgWarehouseDir := roleGroup.WarehouseDir; rgWarehouseDir != "" {
+			warehouseDir = rgWarehouseDir
 		}
 	}
 
 	hiveConfVolumeNameFunc := func() string { return instance.GetNameWithSuffix(roleGroupName + "-conf") }
 	hiveDataVolumeNameFunc := func() string { return instance.GetNameWithSuffix(roleGroupName + "-data") }
-	var dbCollection *opgo.DatabaseConnection
+	var dbConnection *opgo.DatabaseConnection
 	var err error
-	if _, dbCollection, err = r.fetchDbForRoleGroup(instance, ctx, roleGroup); err != nil {
-		return nil, errors.Wrap(err, "Fetch db collection for roleGroup err")
+	if _, dbConnection, err = r.fetchDbForRoleGroup(instance, ctx, roleGroup); err != nil {
+		return nil, errors.Wrap(err, "Fetch db connection for roleGroup err")
 	}
-	pg := dbCollection.Spec.Provider.Postgres
+	pg := dbConnection.Spec.Provider.Postgres
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.GetNameWithSuffix(roleGroupName),
@@ -431,7 +520,7 @@ func (r *HiveMetastoreReconciler) extractDeploymentForRoleGroup(instance *stackv
 								},
 								{
 									Name:      hiveDataVolumeNameFunc(),
-									MountPath: "/opt/hive/data",
+									MountPath: warehouseDir,
 								},
 							},
 						},
@@ -525,16 +614,16 @@ func (r *HiveMetastoreReconciler) extractSecretForRoleGroup(instance *stackv1alp
 	}
 
 	var (
-		s3Collection *opgo.S3Connection
+		s3Connection *opgo.S3Connection
 		dbrsc        *opgo.Database
-		dbCollection *opgo.DatabaseConnection
+		dbConnection *opgo.DatabaseConnection
 		err          error
 	)
 	if s3 != nil {
 		s3Bucket := &opgo.S3Bucket{
 			ObjectMeta: metav1.ObjectMeta{Name: s3.Reference},
 		}
-		s3Collection, err = r.fetchS3(s3Bucket, ctx, instance)
+		s3Connection, err = r.fetchS3(s3Bucket, ctx, instance)
 		if err != nil {
 			return nil, err
 		}
@@ -543,7 +632,7 @@ func (r *HiveMetastoreReconciler) extractSecretForRoleGroup(instance *stackv1alp
 		dbrsc = &opgo.Database{
 			ObjectMeta: metav1.ObjectMeta{Name: db.Reference},
 		}
-		dbCollection, err = r.fetchDb(dbrsc, ctx, instance)
+		dbConnection, err = r.fetchDb(dbrsc, ctx, instance)
 		if err != nil {
 			return nil, err
 		}
@@ -554,10 +643,10 @@ func (r *HiveMetastoreReconciler) extractSecretForRoleGroup(instance *stackv1alp
 	}
 
 	data := make(map[string][]byte)
-	if err = r.makeDatabaseData(dbrsc, dbCollection, ctx, instance, &data); err != nil {
+	if err = r.makeDatabaseData(dbrsc, dbConnection, ctx, instance, &data); err != nil {
 		return nil, err
 	}
-	r.makeS3Data(s3Collection, &data)
+	r.makeS3Data(s3Connection, &data)
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.GetNameWithSuffix(roleGroupName),
@@ -576,7 +665,7 @@ func (r *HiveMetastoreReconciler) extractSecretForRoleGroup(instance *stackv1alp
 	return &secretEx, nil
 }
 
-func (r *HiveMetastoreReconciler) makeDatabaseData(dbrsc *opgo.Database, dbCollection *opgo.DatabaseConnection,
+func (r *HiveMetastoreReconciler) makeDatabaseData(dbrsc *opgo.Database, dbConnection *opgo.DatabaseConnection,
 	ctx context.Context, instance *stackv1alpha1.HiveMetastore, data *map[string][]byte) error {
 	fetchUsrPassFunc := func() ([]string, error) {
 		dbCredential := dbrsc.Spec.Credential
@@ -612,19 +701,19 @@ func (r *HiveMetastoreReconciler) makeDatabaseData(dbrsc *opgo.Database, dbColle
 		"              -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://%s:%d/%s\n" +
 		"              -Djavax.jdo.option.ConnectionUserName=%s\n" +
 		"              -Djavax.jdo.option.ConnectionPassword=%s"
-	pg := dbCollection.Spec.Provider.Postgres
-	serviceOpts := fmt.Sprintf(serviceOptsTemp, pg.Host, pg.Port, dbCollection.Name, usrPass[0], usrPass[1])
+	pg := dbConnection.Spec.Provider.Postgres
+	serviceOpts := fmt.Sprintf(serviceOptsTemp, pg.Host, pg.Port, dbrsc.Spec.DatabaseName, usrPass[0], usrPass[1])
 	(*data)["DB_DRIVER"] = []byte(pg.Driver)
 	(*data)["SERVICE_NAME"] = []byte("metastore -hiveconf hive.root.logger=INFO,console")
 	(*data)["SERVICE_OPTS"] = []byte(serviceOpts)
 	return nil
 }
 
-func (r *HiveMetastoreReconciler) makeS3Data(s3Collection *opgo.S3Connection, data *map[string][]byte) {
-	if s3Collection != nil {
-		s3Credential := s3Collection.Spec.S3Credential
+func (r *HiveMetastoreReconciler) makeS3Data(s3Connection *opgo.S3Connection, data *map[string][]byte) {
+	if s3Connection != nil {
+		s3Credential := s3Connection.Spec.S3Credential
 		(*data)["AWS_ACCESS_KEY_ID"] = []byte(s3Credential.AccessKey)
 		(*data)["AWS_SECRET_ACCESS_KEY"] = []byte(s3Credential.SecretKey)
-		(*data)["AWS_DEFAULT_REGION"] = []byte(s3Collection.Spec.Region)
+		(*data)["AWS_DEFAULT_REGION"] = []byte(s3Connection.Spec.Region)
 	}
 }
