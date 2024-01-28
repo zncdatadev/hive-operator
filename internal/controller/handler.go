@@ -3,6 +3,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	stackv1alpha1 "github.com/zncdata-labs/hive-metastore-operator/api/v1alpha1"
 	opgo "github.com/zncdata-labs/operator-go/pkg/apis/commons/v1alpha1"
 	"github.com/zncdata-labs/operator-go/pkg/errors"
@@ -14,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 // Resource todo for dep, svc and so on
@@ -103,40 +104,6 @@ func (r *HiveMetastoreReconciler) extractResources(instance *stackv1alpha1.HiveM
 func (r *HiveMetastoreReconciler) reconcilePvc(ctx context.Context, instance *stackv1alpha1.HiveMetastore) error {
 	err := r.createOrUpdateResource(ctx, instance, r.extractPvcForRoleGroup)
 	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *HiveMetastoreReconciler) makePv(ctx context.Context, instance *stackv1alpha1.HiveMetastore,
-	mergeLabels map[string]string, groupName string, storageClassName *string, storageSize string,
-	warehouseDir string, volumeMode *corev1.PersistentVolumeMode) error {
-	className := ""
-	if storageClassName != nil {
-		className = *storageClassName
-	}
-	pv := &corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.GetNameWithSuffix(groupName),
-			Namespace: instance.Namespace,
-			Labels:    mergeLabels,
-		},
-		Spec: corev1.PersistentVolumeSpec{
-			Capacity: corev1.ResourceList{
-				corev1.ResourceStorage: resource.MustParse(storageSize),
-			},
-			PersistentVolumeSource: corev1.PersistentVolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: warehouseDir,
-				},
-			},
-			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			StorageClassName: className,
-			VolumeMode:       volumeMode,
-		},
-	}
-	if err := CreateOrUpdate(ctx, r.Client, pv); err != nil {
-		r.Log.Error(err, "Failed to create or update Resource", "resource", pv)
 		return err
 	}
 	return nil
