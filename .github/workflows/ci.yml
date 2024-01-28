@@ -3,7 +3,9 @@ name: CI
 on: ['push', 'pull_request']
 
 jobs:
-  test:
+
+  golang-test:
+    name: Golang Test
     runs-on: ubuntu-22.04
     strategy:
       matrix:
@@ -29,8 +31,51 @@ jobs:
         name: Go-results-${{ matrix.go-version }}
         path: TestResults-${{ matrix.go-version }}.json
 
-  linting:
-    name: Lint Code Base
+  golang-lint:
+    name: Golang Lint
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache: false
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        # Require: The version of golangci-lint to use.
+        # When `install-mode` is `binary` (default) the value can be v1.2 or v1.2.3 or `latest` to use the latest version.
+        # When `install-mode` is `goinstall` the value can be v1.2.3, `latest`, or the hash of a commit.
+        version: v1.54
+
+        # Optional: working directory, useful for monorepos
+        # working-directory: somedir
+
+        # Optional: golangci-lint command line arguments.
+        #
+        # Note: By default, the `.golangci.yml` file should be at the root of the repository.
+        # The location of the configuration file can be changed by using `--config=`
+        # args: --timeout=30m --config=/my/path/.golangci.yml --issues-exit-code=0
+        args: --timeout=30m
+
+        # Optional: show only new issues if it's a pull request. The default value is `false`.
+        # only-new-issues: true
+
+        # Optional: if set to true, then all caching functionality will be completely disabled,
+        #           takes precedence over all other caching options.
+        # skip-cache: true
+
+        # Optional: if set to true, then the action won't cache or restore ~/go/pkg.
+        # skip-pkg-cache: true
+
+        # Optional: if set to true, then the action won't cache or restore ~/.cache/go-build.
+        # skip-build-cache: true
+
+        # Optional: The mode to install golangci-lint. It can be 'binary' or 'goinstall'.
+        # install-mode: "goinstall"
+
+  markdown-lint:
+    name: Markdown Lint
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout Code
@@ -47,12 +92,14 @@ jobs:
         LINTER_RULES_PATH: /
         MARKDOWN_CONFIG_FILE: .markdownlint.yml
 
-  deploy-quay:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'zncdata-labs/spark-k8s-operator'
+  deploy-operator:
+    name: Deploy operator
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'zncdata-labs'
     runs-on: ubuntu-22.04
     needs:
-    - test
-    - linting
+    - golang-test
+    - markdown-lint
+    - golang-lint
     steps:
     - uses: actions/checkout@v3
       with:
@@ -61,6 +108,8 @@ jobs:
       uses: docker/setup-qemu-action@v3
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
+      with:
+        platforms: linux/amd64,linux/arm64
     - name: Login to quay.io
       uses: docker/login-action@v2
       with:
@@ -76,3 +125,4 @@ jobs:
       run: |
         make bundle
         make bundle-buildx
+
