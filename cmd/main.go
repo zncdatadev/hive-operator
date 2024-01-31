@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	stackv1alpha1 "github.com/zncdata-labs/hive-metastore-operator/api/v1alpha1"
-	"github.com/zncdata-labs/hive-metastore-operator/internal/controller"
+	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	"github.com/zncdata-labs/hive-operator/internal/controller"
 	commonsv1alph1 "github.com/zncdata-labs/operator-go/pkg/apis/commons/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )

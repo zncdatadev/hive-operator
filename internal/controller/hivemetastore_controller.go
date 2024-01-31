@@ -19,7 +19,7 @@ package controller
 import (
 	"context"
 	"github.com/go-logr/logr"
-	stackv1alpha1 "github.com/zncdata-labs/hive-metastore-operator/api/v1alpha1"
+	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	"github.com/zncdata-labs/operator-go/pkg/status"
 	"github.com/zncdata-labs/operator-go/pkg/util"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"

@@ -3,7 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
-	"github.com/zncdata-labs/hive-metastore-operator/api/v1alpha1"
+	"github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	"github.com/zncdata-labs/operator-go/pkg/status"
 	"github.com/zncdata-labs/operator-go/pkg/util"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"

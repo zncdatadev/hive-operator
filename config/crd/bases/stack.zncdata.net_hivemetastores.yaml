@@ -46,10 +46,10 @@ spec:
                     - IfNotPresent
                     type: string
                   repository:
-                    default: docker.io/apache/hive-metastore
+                    default: docker.io/apache/hive
                     type: string
                   tag:
-                    default: latest
+                    default: 4.0.0-beta-1
                     type: string
                 type: object
               roleConfig:
@@ -1177,10 +1177,10 @@ spec:
                         - IfNotPresent
                         type: string
                       repository:
-                        default: docker.io/apache/hive-metastore
+                        default: docker.io/apache/hive
                         type: string
                       tag:
-                        default: latest
+                        default: 4.0.0-beta-1
                         type: string
                     type: object
                   matchLabels:
@@ -2580,10 +2580,10 @@ spec:
                           - IfNotPresent
                           type: string
                         repository:
-                          default: docker.io/apache/hive-metastore
+                          default: docker.io/apache/hive
                           type: string
                         tag:
-                          default: latest
+                          default: 4.0.0-beta-1
                           type: string
                       type: object
                     matchLabels:

@@ -24,6 +24,7 @@ import (
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+
 // HiveMetastore is the Schema for the hivemetastores API
 type HiveMetastore struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -34,6 +35,8 @@ type HiveMetastore struct {
 }
 
 // +kubebuilder:object:root=true
+
+// HiveMetastoreList contains a list of HiveMetastore
 type HiveMetastoreList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -42,11 +45,11 @@ type HiveMetastoreList struct {
 
 type ImageSpec struct {
 	// +kubebuilder:validation=Optional
-	// +kubebuilder:default=docker.io/apache/hive-metastore
+	// +kubebuilder:default=docker.io/apache/hive
 	Repository string `json:"repository,omitempty"`
 
 	// +kubebuilder:validation=Optional
-	// +kubebuilder:default=latest
+	// +kubebuilder:default="4.0.0-beta-1"
 	Tag string `json:"tag,omitempty"`
 
 	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent

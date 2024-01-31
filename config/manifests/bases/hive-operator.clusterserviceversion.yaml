@@ -7,7 +7,7 @@ metadata:
     categories: Storage, Compute
     datasuit: Develop, Analysis, Governance
     icon: https://hive.apache.org/favicon.ico
-  name: hive-metastore-operator.v0.0.0
+  name: hive-operator.v0.0.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -18,8 +18,8 @@ spec:
       kind: HiveMetastore
       name: hivemetastores.stack.zncdata.net
       version: v1alpha1
-  description: hive metastore for operator
-  displayName: hive-metastore-operator
+  description: hive for operator
+  displayName: hive-operator
   icon:
   - base64data: ""
     mediatype: ""
@@ -40,8 +40,10 @@ spec:
   - hive
   - metastore
   links:
-  - name: Hive Metastore Operator
-    url: https://hive-metastore-operator.domain
+  - name: Hive Operator
+    url: https://github.com/zncdata-labs/hive-operator
+  - name: Apache Hive
+    url: https://hive.apache.org/
   maturity: alpha
   provider:
     name: zncdata-labs

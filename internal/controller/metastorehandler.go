@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	stackv1alpha1 "github.com/zncdata-labs/hive-metastore-operator/api/v1alpha1"
+	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	opgo "github.com/zncdata-labs/operator-go/pkg/apis/commons/v1alpha1"
 	"github.com/zncdata-labs/operator-go/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
