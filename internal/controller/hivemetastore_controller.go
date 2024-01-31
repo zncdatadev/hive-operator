@@ -36,9 +36,9 @@ type HiveMetastoreReconciler struct {
 	Log    logr.Logger
 }
 
-//+kubebuilder:rbac:groups=stack.zncdata.net,resources=hivemetastores,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=stack.zncdata.net,resources=hivemetastores/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=stack.zncdata.net,resources=hivemetastores/finalizers,verbs=update
+//+kubebuilder:rbac:groups=stack.zncdata.dev,resources=hivemetastores,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=stack.zncdata.dev,resources=hivemetastores/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=stack.zncdata.dev,resources=hivemetastores/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete

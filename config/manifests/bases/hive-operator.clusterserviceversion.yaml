@@ -16,7 +16,7 @@ spec:
     - description: HiveMetastore is the Schema for the hivemetastores API
       displayName: Hive Metastore
       kind: HiveMetastore
-      name: hivemetastores.stack.zncdata.net
+      name: hivemetastores.stack.zncdata.dev
       version: v1alpha1
   description: hive for operator
   displayName: hive-operator

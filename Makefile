@@ -30,7 +30,7 @@ REGISTRY ?= quay.io/zncdata
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# zncdata.net/hive-operator-bundle:$VERSION and zncdata.net/hive-operator-catalog:$VERSION.
+# zncdata.dev/hive-operator-bundle:$VERSION and zncdata.dev/hive-operator-catalog:$VERSION.
 IMAGE_TAG_BASE ?= $(REGISTRY)/hive-operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
