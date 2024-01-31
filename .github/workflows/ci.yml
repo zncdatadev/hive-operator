@@ -24,12 +24,7 @@ jobs:
     - name: Install dependencies
       run: go get ./...
     - name: Test with Go
-      run: go test ./... -json > TestResults-${{ matrix.go-version }}.json
-    - name: Upload Go test results
-      uses: actions/upload-artifact@v4
-      with:
-        name: Go-results-${{ matrix.go-version }}
-        path: TestResults-${{ matrix.go-version }}.json
+      run: make test
 
   golang-lint:
     name: Golang Lint
