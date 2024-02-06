@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,7 +35,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	stackv1alpha1 "github.com/zncdata-labs/hive-metastore-operator/api/v1alpha1"
+	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -45,6 +46,8 @@ var (
 	cfg        *rest.Config
 	k8sClient  client.Client
 	testEnv    *envtest.Environment
+	ctx        context.Context
+	cancel     context.CancelFunc
 	k8sVersion string
 )
 
@@ -63,7 +66,7 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
-
+	ctx, cancel = context.WithCancel(context.TODO())
 	By("bootstrapping test environment")
 
 	Expect(os.Setenv(
@@ -101,9 +104,16 @@ var _ = BeforeSuite(func() {
 		Scheme: k8sManager.GetScheme(),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
+
+	//go func() {
+	//	defer GinkgoRecover()
+	//	err = k8sManager.Start(ctx)
+	//	Expect(err).ToNot(HaveOccurred(), "failed to run manager")
+	//}()
 })
 
 var _ = AfterSuite(func() {
+	cancel()
 	By("tearing down the test environment")
 	Expect(testEnv.Stop()).To(Succeed())
 	Expect(os.Unsetenv("KUBEBUILDER_ASSETS")).To(Succeed())

@@ -6,13 +6,13 @@ metadata:
     app.kubernetes.io/name: clusterrole
     app.kubernetes.io/instance: hivemetastore-editor-role
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: hive-metastore-operator
-    app.kubernetes.io/part-of: hive-metastore-operator
+    app.kubernetes.io/created-by: hive-operator
+    app.kubernetes.io/part-of: hive-operator
     app.kubernetes.io/managed-by: kustomize
   name: hivemetastore-editor-role
 rules:
 - apiGroups:
-  - stack.zncdata.net
+  - stack.zncdata.dev
   resources:
   - hivemetastores
   verbs:
@@ -24,7 +24,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - stack.zncdata.net
+  - stack.zncdata.dev
   resources:
   - hivemetastores/status
   verbs:

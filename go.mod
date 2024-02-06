@@ -1,4 +1,4 @@
-module github.com/zncdata-labs/hive-metastore-operator
+module github.com/zncdata-labs/hive-operator
 
 go 1.21
 

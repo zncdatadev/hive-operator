@@ -2,12 +2,10 @@ package controller
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	goerr "errors"
 	"github.com/cisco-open/k8s-objectmatcher/patch"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,7 +18,7 @@ var (
 	logger = ctrl.Log.WithName("utils")
 )
 
-func CreateOrUpdate(ctx context.Context, c client.Client, obj client.Object) error {
+func CreateOrUpdate(ctx context.Context, c client.Client, obj client.Object) (bool, error) {
 	key := client.ObjectKeyFromObject(obj)
 	namespace := obj.GetNamespace()
 
@@ -32,10 +30,14 @@ func CreateOrUpdate(ctx context.Context, c client.Client, obj client.Object) err
 	err := c.Get(ctx, key, current)
 	if errors.IsNotFound(err) {
 		if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(obj); err != nil {
-			return err
+			return false, err
 		}
 		logger.Info("Creating a new object", "Kind", kinds, "Namespace", namespace, "Name", name)
-		return c.Create(ctx, obj)
+
+		if err := c.Create(ctx, obj); err != nil {
+			return false, err
+		}
+		return true, nil
 	} else if err == nil {
 		switch obj.(type) {
 		case *corev1.Service:
@@ -63,87 +65,76 @@ func CreateOrUpdate(ctx context.Context, c client.Client, obj client.Object) err
 			resourceVersion := current.(metav1.ObjectMetaAccessor).GetObjectMeta().GetResourceVersion()
 			obj.(metav1.ObjectMetaAccessor).GetObjectMeta().SetResourceVersion(resourceVersion)
 
-			return c.Update(ctx, obj)
+			if err := c.Update(ctx, obj); err != nil {
+				return false, err
+			}
+			return true, nil
 		}
 
 		if !result.IsEmpty() {
-			logger.Info(fmt.Sprintf("Resource update for object %s:%s", kinds, obj.(metav1.ObjectMetaAccessor).GetObjectMeta().GetName()),
+			logger.Info(
+				fmt.Sprintf("Resource update for object %s:%s", kinds, obj.(metav1.ObjectMetaAccessor).GetObjectMeta().GetName()),
 				"patch", string(result.Patch),
-				// "original", string(result.Original),
-				// "modified", string(result.Modified),
-				// "current", string(result.Current),
 			)
 
-			err := patch.DefaultAnnotator.SetLastAppliedAnnotation(obj)
-			if err != nil {
+			if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(obj); err != nil {
 				logger.Error(err, "failed to annotate modified object", "object", obj)
 			}
 
 			resourceVersion := current.(metav1.ObjectMetaAccessor).GetObjectMeta().GetResourceVersion()
 			obj.(metav1.ObjectMetaAccessor).GetObjectMeta().SetResourceVersion(resourceVersion)
 
-			return c.Update(ctx, obj)
+			if err = c.Update(ctx, obj); err != nil {
+				return false, err
+			}
+			return true, nil
 		}
 
 		logger.V(1).Info(fmt.Sprintf("Skipping update for object %s:%s", kinds, obj.(metav1.ObjectMetaAccessor).GetObjectMeta().GetName()))
 
 	}
-	return err
+	return false, err
 }
 
-type Map map[string]string
+// MergeObjects merge right to left, if field not in left, it will be added from right,
+// else skip.
+// Node: If variable is a pointer, it will be modified directly.
+func MergeObjects(left interface{}, right interface{}, exclude []string) {
 
-func (m *Map) MapMerge(source map[string]string, replace bool) {
-	if *m == nil {
-		*m = make(Map)
+	leftValues := reflect.ValueOf(left)
+	rightValues := reflect.ValueOf(right)
+
+	if leftValues.Kind() == reflect.Ptr {
+		leftValues = leftValues.Elem()
 	}
-	for sourceKey, sourceValue := range source {
-		if _, ok := map[string]string(*m)[sourceKey]; !ok || replace {
-			map[string]string(*m)[sourceKey] = sourceValue
+
+	if rightValues.Kind() == reflect.Ptr {
+		rightValues = rightValues.Elem()
+	}
+
+	for i := 0; i < rightValues.NumField(); i++ {
+		field := rightValues.Field(i)
+		fieldName := rightValues.Type().Field(i).Name
+		if !contains(exclude, fieldName) {
+			if reflect.DeepEqual(field.Interface(), reflect.Zero(field.Type()).Interface()) {
+				continue
+			}
+			leftField := leftValues.FieldByName(fieldName)
+
+			if !reflect.DeepEqual(leftField.Interface(), reflect.Zero(leftField.Type()).Interface()) {
+				continue
+			}
+
+			leftField.Set(field)
 		}
 	}
 }
 
-// Convert converts a struct to a map for easy iteration with for range.
-// `struc` can be a pointer or a concrete struct.
-// error will be nil if everything worked.
-func Convert(struc interface{}) (map[string]interface{}, error) {
-
-	returnMap := make(map[string]interface{})
-
-	sType := getStructType(struc)
-
-	if sType.Kind() != reflect.Struct {
-		return returnMap, goerr.New("variable given is not a struct or a pointer to a struct")
-	}
-
-	for i := 0; i < sType.NumField(); i++ {
-		structFieldName := sType.Field(i).Name
-		structVal := reflect.ValueOf(struc)
-		returnMap[structFieldName] = structVal.FieldByName(structFieldName).Interface()
-	}
-
-	return returnMap, nil
-}
-
-func getStructType(struc interface{}) reflect.Type {
-	sType := reflect.TypeOf(struc)
-	if sType.Kind() == reflect.Ptr {
-		sType = sType.Elem()
-	}
-
-	return sType
-}
-
-func DecodeBase64Data(data *map[string][]byte, key string) (*string, error) {
-	obj := *data
-	if usernameByte, ok := obj[key]; ok {
-		if decodedUsr, err := base64.StdEncoding.DecodeString(string(usernameByte)); err != nil {
-			return nil, err
-		} else {
-			username := string(decodedUsr)
-			return &username, nil
+func contains(slice []string, str string) bool {
+	for _, v := range slice {
+		if v == str {
+			return true
 		}
 	}
-	return nil, fmt.Errorf("byte map data not contain key: %s", key)
+	return false
 }

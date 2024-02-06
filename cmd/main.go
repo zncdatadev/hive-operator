@@ -31,16 +31,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	stackv1alpha1 "github.com/zncdata-labs/hive-metastore-operator/api/v1alpha1"
-	"github.com/zncdata-labs/hive-metastore-operator/internal/controller"
+	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	"github.com/zncdata-labs/hive-operator/internal/controller"
 	commonsv1alph1 "github.com/zncdata-labs/operator-go/pkg/apis/commons/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 
 var (
-	scheme        = runtime.NewScheme()
-	setupLog      = ctrl.Log.WithName("setup")
-	reconcrileLog = ctrl.Log.WithName("reconciler")
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
 )
 
 func init() {
@@ -73,7 +72,7 @@ func main() {
 		Scheme:                 scheme,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "d5bf9a68.zncdata.net",
+		LeaderElectionID:       "d5bf9a68.zncdata.dev",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -94,7 +93,6 @@ func main() {
 	if err = (&controller.HiveMetastoreReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-		Log:    reconcrileLog,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HiveMetastore")
 		os.Exit(1)
