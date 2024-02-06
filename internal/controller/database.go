@@ -133,10 +133,10 @@ func (d *DatabaseConfiguration) getDatabaseParamsFromResource() (*DatabaseParams
 		dbParams.Port = strconv.Itoa(provider.Postgres.Port)
 		dbParams.DbName = db.Spec.DatabaseName
 		return dbParams, nil
-	} else if provider.Mysq != nil {
+	} else if provider.Mysql != nil {
 		dbParams.Driver = "mysql"
-		dbParams.Host = provider.Mysq.Host
-		dbParams.Port = strconv.Itoa(provider.Mysq.Port)
+		dbParams.Host = provider.Mysql.Host
+		dbParams.Port = strconv.Itoa(provider.Mysql.Port)
 		dbParams.DbName = db.Spec.DatabaseName
 		return dbParams, nil
 	} else {
