@@ -108,11 +108,11 @@ type RoleSpec struct {
 	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	CommandArgsOverride []string `json:"commandArgsOverride,omitempty"`
+	CommandArgsOverrides []string `json:"commandArgsOverrides,omitempty"`
 	// +kubebuilder:validation:Optional
-	ConfigOverride map[string]string `json:"configOverride,omitempty"`
+	ConfigOverrides map[string]string `json:"configOverrides,omitempty"`
 	// +kubebuilder:validation:Optional
-	EnvOverride map[string]string `json:"envOverride,omitempty"`
+	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
 	//// +kubebuilder:validation:Optional
 	//PodOverride corev1.PodSpec `json:"podOverride,omitempty"`
 }
@@ -152,11 +152,11 @@ type RoleGroupSpec struct {
 	Config *ConfigSpec `json:"config,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	CommandArgsOverride []string `json:"commandArgsOverride,omitempty"`
+	CommandArgsOverrides []string `json:"commandArgsOverrides,omitempty"`
 	// +kubebuilder:validation:Optional
-	ConfigOverride map[string]string `json:"configOverride,omitempty"`
+	ConfigOverrides map[string]string `json:"configOverrides,omitempty"`
 	// +kubebuilder:validation:Optional
-	EnvOverride map[string]string `json:"envOverride,omitempty"`
+	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
 	//// +kubebuilder:validation:Optional
 	//PodOverride corev1.PodSpec `json:"podOverride,omitempty"`
 }
