@@ -14,48 +14,28 @@ import (
 )
 
 type DeploymentReconciler struct {
-	client client.Client
-	scheme *runtime.Scheme
-
-	cr            *stackv1alpha1.HiveMetastore
-	roleGroupName string
-	// Rg should is merged with the RoleGroupSpec and RoleSpec
-	roleGroup *stackv1alpha1.RoleGroupSpec
+	*BaseRoleGroupResourceReconciler
 }
 
 func NewReconcileDeployment(
 	client client.Client,
 	schema *runtime.Scheme,
 	cr *stackv1alpha1.HiveMetastore,
+	roleName string,
 	roleGroupName string,
 	roleGroup *stackv1alpha1.RoleGroupSpec,
 ) *DeploymentReconciler {
 
 	return &DeploymentReconciler{
-		client:        client,
-		scheme:        schema,
-		cr:            cr,
-		roleGroupName: roleGroupName,
-		roleGroup:     roleGroup,
+		&BaseRoleGroupResourceReconciler{
+			client:        client,
+			scheme:        schema,
+			cr:            cr,
+			roleName:      roleName,
+			roleGroupName: roleGroupName,
+			roleGroup:     roleGroup,
+		},
 	}
-}
-
-func (r *DeploymentReconciler) Labels() map[string]string {
-	return map[string]string{
-		"app": r.Name(),
-	}
-}
-
-func (r *DeploymentReconciler) NameSpace() string {
-	return r.cr.Namespace
-}
-
-func (r *DeploymentReconciler) Name() string {
-	return r.cr.GetNameWithSuffix(r.roleGroupName)
-}
-
-func (r *DeploymentReconciler) GetNameWithSuffix(name string) string {
-	return r.Name() + "-" + name
 }
 
 func (r *DeploymentReconciler) RoleGroupConfig() *stackv1alpha1.ConfigSpec {
@@ -143,19 +123,21 @@ func (r *DeploymentReconciler) volumes() []corev1.Volume {
 }
 
 func (r *DeploymentReconciler) make() (*appsv1.Deployment, error) {
+
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.Name(),
 			Namespace: r.NameSpace(),
+			Labels:    r.GetLabels(),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &r.roleGroup.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: r.Labels(),
+				MatchLabels: r.GetLabels(),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: r.Labels(),
+					Labels: r.GetLabels(),
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -305,7 +287,7 @@ func (r *DeploymentReconciler) CheckPodsSatisfied(ctx context.Context) (bool, er
 	pods := corev1.PodList{}
 	podListOptions := []client.ListOption{
 		client.InNamespace(r.NameSpace()),
-		client.MatchingLabels(r.Labels()),
+		client.MatchingLabels(r.GetLabels()),
 	}
 	err := r.client.List(ctx, &pods, podListOptions...)
 	if err != nil {
