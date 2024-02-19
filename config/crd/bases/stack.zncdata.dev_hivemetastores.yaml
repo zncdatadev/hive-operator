@@ -1509,8 +1509,11 @@ spec:
                         type: string
                     type: object
                   configOverrides:
-                    additionalProperties:
-                      type: string
+                    properties:
+                      hive-site.xml:
+                        additionalProperties:
+                          type: string
+                        type: object
                     type: object
                   envOverrides:
                     additionalProperties:
@@ -3005,8 +3008,11 @@ spec:
                               type: string
                           type: object
                         configOverrides:
-                          additionalProperties:
-                            type: string
+                          properties:
+                            hive-site.xml:
+                              additionalProperties:
+                                type: string
+                              type: object
                           type: object
                         envOverrides:
                           additionalProperties:

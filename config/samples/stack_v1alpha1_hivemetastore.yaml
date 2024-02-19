@@ -10,8 +10,6 @@ metadata:
   name: hivemetastore-sample
 spec:
   metastore:
-    envOverrides:
-      aa: "111"
     roleGroups:
       default:
         replicas: 1

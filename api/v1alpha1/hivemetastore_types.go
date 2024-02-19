@@ -110,11 +110,15 @@ type RoleSpec struct {
 	// +kubebuilder:validation:Optional
 	CommandArgsOverrides []string `json:"commandArgsOverrides,omitempty"`
 	// +kubebuilder:validation:Optional
-	ConfigOverrides map[string]string `json:"configOverrides,omitempty"`
+	ConfigOverrides *ConfigOverridesSpec `json:"configOverrides,omitempty"`
 	// +kubebuilder:validation:Optional
 	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
 	//// +kubebuilder:validation:Optional
 	//PodOverride corev1.PodSpec `json:"podOverride,omitempty"`
+}
+
+type ConfigOverridesSpec struct {
+	HiveSite map[string]string `json:"hive-site.xml,omitempty"`
 }
 
 type ConfigSpec struct {
@@ -154,7 +158,7 @@ type RoleGroupSpec struct {
 	// +kubebuilder:validation:Optional
 	CommandArgsOverrides []string `json:"commandArgsOverrides,omitempty"`
 	// +kubebuilder:validation:Optional
-	ConfigOverrides map[string]string `json:"configOverrides,omitempty"`
+	ConfigOverrides *ConfigOverridesSpec `json:"configOverrides,omitempty"`
 	// +kubebuilder:validation:Optional
 	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
 	//// +kubebuilder:validation:Optional
