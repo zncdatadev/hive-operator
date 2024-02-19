@@ -2,6 +2,9 @@ package controller
 
 import (
 	"context"
+	"strconv"
+	"time"
+
 	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	"github.com/zncdata-labs/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
@@ -9,8 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"time"
 )
 
 type SecretReconciler interface {
@@ -293,7 +294,17 @@ func (r *HiveSiteSecret) Reconcile(ctx context.Context) (ctrl.Result, error) {
 
 func (r *HiveSiteSecret) apply(ctx context.Context) (ctrl.Result, error) {
 
-	value := hiveSiteXML(r.hiveSiteProperties())
+	properties, err := r.hiveSiteProperties()
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	properties, err = r.overridesHiveSiteProperties(properties)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	value := hiveSiteXML(properties)
 
 	data := map[string][]byte{
 		HiveSiteName: []byte(value),
@@ -336,7 +347,10 @@ func (r *HiveSiteSecret) warehouseDir() string {
 	return stackv1alpha1.WarehouseDir
 }
 
-func (r *HiveSiteSecret) hiveSiteProperties() map[string]string {
+func (r *HiveSiteSecret) hiveSiteProperties() (map[string]string, error) {
+	properties := map[string]string{
+		"hive.metastore.warehouse.dir": r.warehouseDir(),
+	}
 	if r.s3.Enabled() {
 		var params *S3Params
 
@@ -344,28 +358,33 @@ func (r *HiveSiteSecret) hiveSiteProperties() map[string]string {
 			var err error
 			params, err = r.s3.GetS3ParamsFromResource()
 			if err != nil {
-				return nil
+				return nil, err
 			}
 		} else {
 			var err error
 			params, err = r.s3.GetS3ParamsFromInline()
 			if err != nil {
-				return nil
+				return nil, err
 			}
 		}
-		return map[string]string{
-			"hive.metastore.warehouse.dir":   r.warehouseDir(),
-			"hive.metastore.s3.path":         params.Bucket,
-			"fs.s3a.connection.ssl.enabled":  strconv.FormatBool(params.SSL),
-			"fs.s3a.path.style.access":       strconv.FormatBool(params.PathStyle),
-			"fs.s3a.impl":                    "org.apache.hadoop.fs.s3a.S3AFileSystem",
-			"fs.AbstractFileSystem.s3a.impl": "org.apache.hadoop.fs.s3a.S3A",
-		}
+
+		properties["hive.metastore.s3.path"] = params.Bucket
+		properties["fs.s3a.connection.ssl.enabled"] = strconv.FormatBool(params.SSL)
+		properties["fs.s3a.path.style.access"] = strconv.FormatBool(params.PathStyle)
+		properties["fs.s3a.impl"] = "org.apache.hadoop.fs.s3a.S3AFileSystem"
+		properties["fs.AbstractFileSystem.s3a.impl"] = "org.apache.hadoop.fs.s3a.S3A"
 	}
 
-	return map[string]string{
-		"hive.metastore.warehouse.dir": r.warehouseDir(),
+	return properties, nil
+}
+
+func (r *HiveSiteSecret) overridesHiveSiteProperties(properties map[string]string) (map[string]string, error) {
+	if r.roleGroup.ConfigOverrides != nil && r.roleGroup.ConfigOverrides.HiveSite != nil {
+		for k, v := range r.roleGroup.ConfigOverrides.HiveSite {
+			properties[k] = v
+		}
 	}
+	return properties, nil
 }
 
 func hiveSiteXML(properties map[string]string) string {
