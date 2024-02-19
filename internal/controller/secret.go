@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	"github.com/zncdata-labs/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -72,7 +73,7 @@ func (r *EnvSecret) Reconcile(ctx context.Context) (ctrl.Result, error) {
 }
 
 func (r *EnvSecret) apply(ctx context.Context) (ctrl.Result, error) {
-	var data = make(map[string][]byte)
+	var data = make(map[string]string)
 	if r.s3.Enabled() {
 		s3Data, err := r.s3SecretData()
 		if err != nil {
@@ -115,16 +116,16 @@ func (r *EnvSecret) apply(ctx context.Context) (ctrl.Result, error) {
 	return ctrl.Result{Requeue: false}, nil
 }
 
-func (r *EnvSecret) s3SecretData() (map[string][]byte, error) {
+func (r *EnvSecret) s3SecretData() (map[string]string, error) {
 	if r.s3.ExistingS3Bucket() {
 		params, err := r.s3.GetS3ParamsFromResource()
 		if err != nil {
 			return nil, err
 		}
-		return map[string][]byte{
-			"AWS_ACCESS_KEY":     []byte(params.AccessKey),
-			"AWS_SECRET_KEY":     []byte(params.SecretKey),
-			"AWS_DEFAULT_REGION": []byte(params.Region),
+		return map[string]string{
+			"AWS_ACCESS_KEY":     params.AccessKey,
+			"AWS_SECRET_KEY":     params.SecretKey,
+			"AWS_DEFAULT_REGION": params.Region,
 		}, nil
 	}
 
@@ -133,23 +134,23 @@ func (r *EnvSecret) s3SecretData() (map[string][]byte, error) {
 		return nil, err
 	}
 
-	return map[string][]byte{
-		"AWS_ACCESS_KEY":     []byte(params.AccessKey),
-		"AWS_SECRET_KEY":     []byte(params.SecretKey),
-		"AWS_DEFAULT_REGION": []byte(params.Region),
+	return map[string]string{
+		"AWS_ACCESS_KEY":     params.AccessKey,
+		"AWS_SECRET_KEY":     params.SecretKey,
+		"AWS_DEFAULT_REGION": params.Region,
 	}, nil
 
 }
 
 // databaseValuesFromCR Get database values from the CR.
-func (r *EnvSecret) databaseSecretData() (map[string][]byte, error) {
+func (r *EnvSecret) databaseSecretData() (map[string]string, error) {
 
-	dataBuilder := func(params *DatabaseParams) map[string][]byte {
+	dataBuilder := func(params *DatabaseParams) map[string]string {
 		serviceOpts := serviceOptsBuilder(params.Driver, params.Username, params.Password, params.Host, params.Port, params.DbName)
 
-		data := map[string][]byte{
-			"SERVICE_OPTS": []byte(serviceOpts),
-			"DB_DRIVER":    []byte(params.Driver),
+		data := map[string]string{
+			"SERVICE_OPTS": serviceOpts,
+			"DB_DRIVER":    params.Driver,
 		}
 		if params.Driver == "derby" {
 			log.Info("Hive metastore is using derby, no need to set database connection info.")
@@ -176,14 +177,18 @@ func (r *EnvSecret) databaseSecretData() (map[string][]byte, error) {
 }
 
 // makeSecret Make secret object from data, and set the owner reference.
-func (r *EnvSecret) make(data map[string][]byte) (corev1.Secret, error) {
+func (r *EnvSecret) make(data map[string]string) (corev1.Secret, error) {
+	encodedData := make(map[string][]byte)
+	for k, v := range data {
+		encodedData[k] = []byte(util.Base64[string]{Data: v}.Encode())
+	}
 	obj := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      HiveEnvSecretName(r.cr),
 			Namespace: r.NameSpace(),
 			Labels:    r.Labels(),
 		},
-		Data: data,
+		Data: encodedData,
 	}
 
 	if err := ctrl.SetControllerReference(r.cr, &obj, r.scheme); err != nil {
