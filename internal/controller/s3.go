@@ -3,6 +3,7 @@ package controller
 import (
 	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	commonsv1alpha1 "github.com/zncdata-labs/operator-go/pkg/apis/commons/v1alpha1"
+	"github.com/zncdata-labs/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -81,14 +82,20 @@ func (s *S3Configuration) GetCredential(name string) (*S3Credential, error) {
 			Name:      name,
 		},
 	}
-	// Get Secret from the reference
 	if err := s.ResourceClient.Get(secret); err != nil {
 		return nil, err
 	}
-
+	ak, err := util.Base64[[]byte]{Data: secret.Data[S3AccessKeyName]}.Decode()
+	if err != nil {
+		return nil, err
+	}
+	sk, err := util.Base64[[]byte]{Data: secret.Data[S3SecretKeyName]}.Decode()
+	if err != nil {
+		return nil, err
+	}
 	return &S3Credential{
-		AccessKey: string(secret.Data[S3AccessKeyName]),
-		SecretKey: string(secret.Data[S3SecretKeyName]),
+		AccessKey: string(ak),
+		SecretKey: string(sk),
 	}, nil
 }
 
@@ -105,11 +112,11 @@ func (s *S3Configuration) GetS3ParamsFromResource() (*S3Params, error) {
 	credential := &S3Credential{}
 
 	if s3BucketCR.Spec.Credential.ExistSecret != "" {
-		exist, err := s.GetCredential(s3BucketCR.Spec.Credential.ExistSecret)
+		existCredential, err := s.GetCredential(s3BucketCR.Spec.Credential.ExistSecret)
 		if err != nil {
 			return nil, err
 		}
-		credential = exist
+		credential = existCredential
 	} else {
 		credential.AccessKey = s3BucketCR.Spec.Credential.AccessKey
 		credential.SecretKey = s3BucketCR.Spec.Credential.SecretKey
