@@ -6,6 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 )
 
 type MetastoreRole struct {
@@ -31,6 +32,10 @@ func NewMetastoreRole(
 	}
 }
 
+func (r *MetastoreRole) Name() string {
+	return "hivemetastore"
+}
+
 func (r *MetastoreRole) EnabledClusterConfig() bool {
 	return r.cr.Spec.ClusterConfig != nil
 }
@@ -53,7 +58,6 @@ func (r *MetastoreRole) MergeFromRole(roleGroup *stackv1alpha1.RoleGroupSpec) *s
 }
 
 func (r *MetastoreRole) Reconcile(ctx context.Context) (ctrl.Result, error) {
-
 	if r.EnabledClusterConfig() {
 		envSecret := NewEnvSecret(ctx, r.client, r.scheme, r.cr)
 		res, err := envSecret.Reconcile(ctx)
@@ -110,7 +114,8 @@ func (r *MetastoreRole) reconcileRoleGroup(
 		r.client,
 		r.scheme,
 		r.cr,
-		name,
+		r.Name(), // roleName
+		name,     // roleGroupName
 		roleGroup,
 	)
 
@@ -121,4 +126,36 @@ func (r *MetastoreRole) reconcileRoleGroup(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+type BaseRoleGroupResourceReconciler struct {
+	client client.Client
+	scheme *runtime.Scheme
+
+	cr            *stackv1alpha1.HiveMetastore
+	roleName      string
+	roleGroupName string
+	roleGroup     *stackv1alpha1.RoleGroupSpec
+}
+
+func (r *DeploymentReconciler) NameSpace() string {
+	return r.cr.Namespace
+}
+
+func (r *BaseRoleGroupResourceReconciler) Name() string {
+	return r.cr.GetNameWithSuffix(r.roleGroupName)
+}
+
+func (r *BaseRoleGroupResourceReconciler) GetNameWithSuffix(name string) string {
+	return r.Name() + "-" + name
+}
+
+func (r *BaseRoleGroupResourceReconciler) GetLabels() map[string]string {
+	labels := r.cr.GetLabels()
+	roleLabels := RoleLabels{cr: r.cr, name: r.roleName}
+	for k, v := range roleLabels.GetLabels() {
+		labels[k] = v
+	}
+	labels["app.kubernetes.io/instance"] = strings.ToLower(r.Name())
+	return labels
 }
