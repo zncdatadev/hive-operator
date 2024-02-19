@@ -12,4 +12,7 @@ spec:
   metastore:
     roleGroups:
       default:
+        config:
+          podDisruptionBudget:
+            minAvailable: 1
         replicas: 1

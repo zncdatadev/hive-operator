@@ -1238,6 +1238,15 @@ spec:
                         additionalProperties:
                           type: string
                         type: object
+                      podDisruptionBudget:
+                        properties:
+                          maxUnavailable:
+                            format: int32
+                            type: integer
+                          minAvailable:
+                            format: int32
+                            type: integer
+                        type: object
                       resources:
                         properties:
                           cpu:
@@ -1516,6 +1525,15 @@ spec:
                   envOverrides:
                     additionalProperties:
                       type: string
+                    type: object
+                  podDisruptionBudget:
+                    properties:
+                      maxUnavailable:
+                        format: int32
+                        type: integer
+                      minAvailable:
+                        format: int32
+                        type: integer
                     type: object
                   roleGroups:
                     additionalProperties:
@@ -2719,6 +2737,15 @@ spec:
                             nodeSelector:
                               additionalProperties:
                                 type: string
+                              type: object
+                            podDisruptionBudget:
+                              properties:
+                                maxUnavailable:
+                                  format: int32
+                                  type: integer
+                                minAvailable:
+                                  format: int32
+                                  type: integer
                               type: object
                             resources:
                               properties:
