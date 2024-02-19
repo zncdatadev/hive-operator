@@ -197,17 +197,6 @@ func (r *DeploymentReconciler) EnableEnvSecret() bool {
 }
 
 func (r *DeploymentReconciler) metastoreContainer() corev1.Container {
-	var envFromSource []corev1.EnvFromSource
-
-	if r.EnableEnvSecret() {
-		envFromSource = append(envFromSource, corev1.EnvFromSource{
-			SecretRef: &corev1.SecretEnvSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: HiveEnvSecretName(r.cr),
-				},
-			},
-		})
-	}
 
 	volumeMounts := []corev1.VolumeMount{
 		{
@@ -242,8 +231,35 @@ func (r *DeploymentReconciler) metastoreContainer() corev1.Container {
 				Name:          "tcp",
 			},
 		},
-		EnvFrom:      envFromSource,
 		VolumeMounts: volumeMounts,
+	}
+
+	if r.EnableEnvSecret() {
+
+		obj.EnvFrom = []corev1.EnvFromSource{
+			{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: HiveEnvSecretName(r.cr),
+					},
+				},
+			},
+		}
+	}
+
+	if r.roleGroup.EnvOverrides != nil {
+		overridesEnv := make([]corev1.EnvVar, 0)
+
+		for key, value := range r.roleGroup.EnvOverrides {
+			if key != "" {
+				overridesEnv = append(overridesEnv, corev1.EnvVar{
+					Name:  key,
+					Value: value,
+				})
+			}
+		}
+
+		obj.Env = append(obj.Env, overridesEnv...)
 	}
 
 	return obj

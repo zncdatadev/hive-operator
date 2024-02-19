@@ -113,19 +113,22 @@ func MergeObjects(left interface{}, right interface{}, exclude []string) {
 	}
 
 	for i := 0; i < rightValues.NumField(); i++ {
-		field := rightValues.Field(i)
-		fieldName := rightValues.Type().Field(i).Name
-		if !contains(exclude, fieldName) {
-			if reflect.DeepEqual(field.Interface(), reflect.Zero(field.Type()).Interface()) {
+		rightField := rightValues.Field(i)
+		rightFieldName := rightValues.Type().Field(i).Name
+		if !contains(exclude, rightFieldName) {
+			// if right field is zero value, skip
+			if reflect.DeepEqual(rightField.Interface(), reflect.Zero(rightField.Type()).Interface()) {
 				continue
 			}
-			leftField := leftValues.FieldByName(fieldName)
+			leftField := leftValues.FieldByName(rightFieldName)
 
+			// if left field is zero value, set it to right field
+			// else skip
 			if !reflect.DeepEqual(leftField.Interface(), reflect.Zero(leftField.Type()).Interface()) {
 				continue
 			}
 
-			leftField.Set(field)
+			leftField.Set(rightField)
 		}
 	}
 }

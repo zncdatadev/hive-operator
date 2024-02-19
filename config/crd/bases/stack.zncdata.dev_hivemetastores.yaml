@@ -146,7 +146,7 @@ spec:
                 type: object
               metastore:
                 properties:
-                  commandArgsOverride:
+                  commandArgsOverrides:
                     items:
                       type: string
                     type: array
@@ -1508,18 +1508,18 @@ spec:
                         default: /opt/hive/data
                         type: string
                     type: object
-                  configOverride:
+                  configOverrides:
                     additionalProperties:
                       type: string
                     type: object
-                  envOverride:
+                  envOverrides:
                     additionalProperties:
                       type: string
                     type: object
                   roleGroups:
                     additionalProperties:
                       properties:
-                        commandArgsOverride:
+                        commandArgsOverrides:
                           items:
                             type: string
                           type: array
@@ -3004,11 +3004,11 @@ spec:
                               default: /opt/hive/data
                               type: string
                           type: object
-                        configOverride:
+                        configOverrides:
                           additionalProperties:
                             type: string
                           type: object
-                        envOverride:
+                        envOverrides:
                           additionalProperties:
                             type: string
                           type: object

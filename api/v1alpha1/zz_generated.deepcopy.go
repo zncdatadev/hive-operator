@@ -371,20 +371,20 @@ func (in *RoleGroupSpec) DeepCopyInto(out *RoleGroupSpec) {
 		*out = new(ConfigSpec)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.CommandArgsOverride != nil {
-		in, out := &in.CommandArgsOverride, &out.CommandArgsOverride
+	if in.CommandArgsOverrides != nil {
+		in, out := &in.CommandArgsOverrides, &out.CommandArgsOverrides
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.ConfigOverride != nil {
-		in, out := &in.ConfigOverride, &out.ConfigOverride
+	if in.ConfigOverrides != nil {
+		in, out := &in.ConfigOverrides, &out.ConfigOverrides
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}
 	}
-	if in.EnvOverride != nil {
-		in, out := &in.EnvOverride, &out.EnvOverride
+	if in.EnvOverrides != nil {
+		in, out := &in.EnvOverrides, &out.EnvOverrides
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
@@ -426,20 +426,20 @@ func (in *RoleSpec) DeepCopyInto(out *RoleSpec) {
 			(*out)[key] = outVal
 		}
 	}
-	if in.CommandArgsOverride != nil {
-		in, out := &in.CommandArgsOverride, &out.CommandArgsOverride
+	if in.CommandArgsOverrides != nil {
+		in, out := &in.CommandArgsOverrides, &out.CommandArgsOverrides
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.ConfigOverride != nil {
-		in, out := &in.ConfigOverride, &out.ConfigOverride
+	if in.ConfigOverrides != nil {
+		in, out := &in.ConfigOverrides, &out.ConfigOverrides
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}
 	}
-	if in.EnvOverride != nil {
-		in, out := &in.EnvOverride, &out.EnvOverride
+	if in.EnvOverrides != nil {
+		in, out := &in.EnvOverrides, &out.EnvOverrides
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val

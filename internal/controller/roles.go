@@ -39,15 +39,16 @@ func (r *MetastoreRole) MergeFromRole(roleGroup *stackv1alpha1.RoleGroupSpec) *s
 
 	copiedRoleGroup := roleGroup.DeepCopy()
 
-	if copiedRoleGroup.Config == nil {
-		return copiedRoleGroup
-	}
-
+	// Merge the role into the role group.
+	// if the role group has a config, and role group not has a config, will
+	// merge the role's config into the role group's config.
 	MergeObjects(copiedRoleGroup, r.Role, []string{"RoleGroups"})
 
-	if r.Role.Config != nil {
+	// merge the role's config into the role group's config
+	if r.Role.Config != nil && copiedRoleGroup.Config != nil {
 		MergeObjects(copiedRoleGroup.Config, r.Role.Config, []string{})
 	}
+
 	return copiedRoleGroup
 }
 
