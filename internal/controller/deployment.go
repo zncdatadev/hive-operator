@@ -58,6 +58,10 @@ func (r *DeploymentReconciler) GetNameWithSuffix(name string) string {
 	return r.Name() + "-" + name
 }
 
+func (r *DeploymentReconciler) RoleGroupConfig() *stackv1alpha1.ConfigSpec {
+	return r.roleGroup.Config
+}
+
 func (r *DeploymentReconciler) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	log.Info("Reconciling Deployment")
 
@@ -163,6 +167,20 @@ func (r *DeploymentReconciler) make() (*appsv1.Deployment, error) {
 		},
 	}
 
+	if r.RoleGroupConfig() != nil {
+		if r.RoleGroupConfig().Affinity != nil {
+			dep.Spec.Template.Spec.Affinity = r.RoleGroupConfig().Affinity
+		}
+
+		if r.RoleGroupConfig().Tolerations != nil {
+			dep.Spec.Template.Spec.Tolerations = r.RoleGroupConfig().Tolerations
+		}
+
+		if r.RoleGroupConfig().NodeSelector != nil {
+			dep.Spec.Template.Spec.NodeSelector = r.RoleGroupConfig().NodeSelector
+		}
+	}
+
 	// Set the ownerRef for the Deployment
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/
 	if err := ctrl.SetControllerReference(r.cr, dep, r.scheme); err != nil {
@@ -184,9 +202,9 @@ func (r *DeploymentReconciler) Image() *stackv1alpha1.ImageSpec {
 }
 
 func (r *DeploymentReconciler) EnabledDataPVC() bool {
-	return r.roleGroup.Config != nil &&
-		r.roleGroup.Config.Resources != nil &&
-		r.roleGroup.Config.Resources.Storage != nil
+	return r.RoleGroupConfig() != nil &&
+		r.RoleGroupConfig().Resources != nil &&
+		r.RoleGroupConfig().Resources.Storage != nil
 
 }
 

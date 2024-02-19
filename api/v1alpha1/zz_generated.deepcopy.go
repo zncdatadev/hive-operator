@@ -116,13 +116,6 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 		*out = new(v1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.MatchLabels != nil {
-		in, out := &in.MatchLabels, &out.MatchLabels
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
 		*out = new(v1.Affinity)
@@ -137,8 +130,10 @@ func (in *ConfigSpec) DeepCopyInto(out *ConfigSpec) {
 	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
-		*out = new(v1.Toleration)
-		(*in).DeepCopyInto(*out)
+		*out = make([]v1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 

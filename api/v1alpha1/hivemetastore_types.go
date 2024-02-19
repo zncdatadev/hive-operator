@@ -129,16 +129,13 @@ type ConfigSpec struct {
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
 
 	// +kubebuilder:validation:Optional
-	MatchLabels map[string]string `json:"matchLabels,omitempty"`
-
-	// +kubebuilder:validation:Optional
 	Affinity *corev1.Affinity `json:"affinity"`
 
 	// +kubebuilder:validation:Optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Tolerations *corev1.Toleration `json:"tolerations"`
+	Tolerations []corev1.Toleration `json:"tolerations"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="/opt/hive/data"
