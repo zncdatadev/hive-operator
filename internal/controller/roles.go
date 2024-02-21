@@ -40,6 +40,14 @@ func (r *MetastoreRole) EnabledClusterConfig() bool {
 	return r.cr.Spec.ClusterConfig != nil
 }
 
+func (r *MetastoreRole) GetLabels() map[string]string {
+	return map[string]string{
+		"app.kubernetes.io/name":       strings.ToLower(r.cr.Name),
+		"app.kubernetes.io/component":  r.Name(),
+		"app.kubernetes.io/managed-by": "hive-operator",
+	}
+}
+
 func (r *MetastoreRole) MergeFromRole(roleGroup *stackv1alpha1.RoleGroupSpec) *stackv1alpha1.RoleGroupSpec {
 
 	copiedRoleGroup := roleGroup.DeepCopy()
@@ -142,6 +150,19 @@ func (r *MetastoreRole) reconcileRoleGroup(
 	}
 
 	if result, err := NewReconcileService(r.client, r.scheme, r.cr, roleGroup).Reconcile(ctx); err != nil {
+		return ctrl.Result{}, err
+	} else if result.RequeueAfter > 0 {
+		return result, nil
+	}
+
+	if result, err := NewLog4jConfigMapRecociler(
+		r.client,
+		r.scheme,
+		r.cr,
+		r.Name(),
+		name,
+		roleGroup,
+	).Reconcile(ctx); err != nil {
 		return ctrl.Result{}, err
 	} else if result.RequeueAfter > 0 {
 		return result, nil

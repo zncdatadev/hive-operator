@@ -45,7 +45,7 @@ func (r *DeploymentReconciler) RoleGroupConfig() *stackv1alpha1.ConfigSpec {
 func (r *DeploymentReconciler) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	log.Info("Reconciling Deployment")
 
-	if res, err := r.applyDeployment(ctx); err != nil {
+	if res, err := r.apply(ctx); err != nil {
 		return ctrl.Result{}, err
 	} else if res.RequeueAfter > 0 {
 		return res, nil
@@ -86,10 +86,19 @@ func (r *DeploymentReconciler) hiveSiteMountName() string {
 	return "hive-site"
 }
 
+func (r *DeploymentReconciler) log4jMountName() string {
+	return "hive-log4j2"
+}
+
+func (r *DeploymentReconciler) metastoreConfigMapName() string {
+	return MetastoreLog4jConfigMapName(r.cr, r.roleGroupName)
+}
+
 func (r *DeploymentReconciler) hiveDataMountName() string {
 	return "warehouse"
 }
 
+// volumes returns the volumes for the deployment
 func (r *DeploymentReconciler) volumes() []corev1.Volume {
 	vs := []corev1.Volume{
 		{
@@ -114,6 +123,25 @@ func (r *DeploymentReconciler) volumes() []corev1.Volume {
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: HiveDataPVCName(r.cr, r.roleGroupName),
+				},
+			},
+		})
+	}
+
+	if r.EnabledLogging() {
+		vs = append(vs, corev1.Volume{
+			Name: r.log4jMountName(),
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: r.metastoreConfigMapName(),
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  HiveMetastoreLog4jName,
+							Path: HiveMetastoreLog4jName,
+						},
+					},
 				},
 			},
 		})
@@ -190,27 +218,77 @@ func (r *DeploymentReconciler) EnabledDataPVC() bool {
 
 }
 
-func (r *DeploymentReconciler) EnableEnvSecret() bool {
-
+func (r *DeploymentReconciler) EnabledEnvSecret() bool {
 	return r.cr.Spec.ClusterConfig != nil &&
 		(r.cr.Spec.ClusterConfig.S3Bucket != nil || r.cr.Spec.ClusterConfig.Database != nil)
 }
 
-func (r *DeploymentReconciler) metastoreContainer() corev1.Container {
+func (r *DeploymentReconciler) EnabledLogging() bool {
+	return r.RoleGroupConfig() != nil &&
+		r.RoleGroupConfig().Logging != nil &&
+		r.RoleGroupConfig().Logging.Metastore != nil
+}
 
-	volumeMounts := []corev1.VolumeMount{
+// volumeMounts returns the volume mounts for the container
+func (r *DeploymentReconciler) volumeMounts() []corev1.VolumeMount {
+	vms := []corev1.VolumeMount{
 		{
 			Name:      r.hiveSiteMountName(),
 			MountPath: "/opt/hive/conf/hive-site.xml",
 			SubPath:   "hive-site.xml",
 		},
 	}
+
 	if r.EnabledDataPVC() {
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+		vms = append(vms, corev1.VolumeMount{
 			Name:      r.hiveDataMountName(),
 			MountPath: stackv1alpha1.WarehouseDir,
 		})
 	}
+
+	if r.EnabledLogging() {
+		vms = append(vms, corev1.VolumeMount{
+			Name:      r.log4jMountName(),
+			MountPath: "/opt/hive/conf/" + HiveMetastoreLog4jName,
+			SubPath:   HiveMetastoreLog4jName,
+		})
+	}
+	return vms
+}
+
+func (r *DeploymentReconciler) containerFromEnvSecret() []corev1.EnvFromSource {
+	envs := make([]corev1.EnvFromSource, 0)
+	if r.EnabledEnvSecret() {
+		envs = append(
+			envs,
+			corev1.EnvFromSource{
+				SecretRef: &corev1.SecretEnvSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: HiveEnvSecretName(r.cr),
+					},
+				},
+			},
+		)
+	}
+	return envs
+}
+
+func (r *DeploymentReconciler) overrideEnv() []corev1.EnvVar {
+	envs := make([]corev1.EnvVar, 0)
+	if r.roleGroup.EnvOverrides != nil {
+		for key, value := range r.roleGroup.EnvOverrides {
+			if key != "" {
+				envs = append(envs, corev1.EnvVar{
+					Name:  key,
+					Value: value,
+				})
+			}
+		}
+	}
+	return envs
+}
+
+func (r *DeploymentReconciler) metastoreContainer() corev1.Container {
 
 	image := r.Image()
 
@@ -231,41 +309,17 @@ func (r *DeploymentReconciler) metastoreContainer() corev1.Container {
 				Name:          "tcp",
 			},
 		},
-		VolumeMounts: volumeMounts,
+		VolumeMounts: r.volumeMounts(),
 	}
 
-	if r.EnableEnvSecret() {
+	obj.EnvFrom = r.containerFromEnvSecret()
 
-		obj.EnvFrom = []corev1.EnvFromSource{
-			{
-				SecretRef: &corev1.SecretEnvSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: HiveEnvSecretName(r.cr),
-					},
-				},
-			},
-		}
-	}
-
-	if r.roleGroup.EnvOverrides != nil {
-		overridesEnv := make([]corev1.EnvVar, 0)
-
-		for key, value := range r.roleGroup.EnvOverrides {
-			if key != "" {
-				overridesEnv = append(overridesEnv, corev1.EnvVar{
-					Name:  key,
-					Value: value,
-				})
-			}
-		}
-
-		obj.Env = append(obj.Env, overridesEnv...)
-	}
+	obj.Env = append(obj.Env, r.overrideEnv()...)
 
 	return obj
 }
 
-func (r *DeploymentReconciler) applyDeployment(ctx context.Context) (ctrl.Result, error) {
+func (r *DeploymentReconciler) apply(ctx context.Context) (ctrl.Result, error) {
 	dep, err := r.make()
 
 	if err != nil {
