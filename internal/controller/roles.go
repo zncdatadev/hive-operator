@@ -51,16 +51,38 @@ func (r *MetastoreRole) MergeFromRole(roleGroup *stackv1alpha1.RoleGroupSpec) *s
 
 	// merge the role's config into the role group's config
 	if r.Role.Config != nil && copiedRoleGroup.Config != nil {
-		MergeObjects(copiedRoleGroup.Config, r.Role.Config, []string{})
+		MergeObjects(copiedRoleGroup.Config, r.Role.Config, []string{"PodDisruptionBudget"})
 	}
 
 	return copiedRoleGroup
 }
 
 func (r *MetastoreRole) Reconcile(ctx context.Context) (ctrl.Result, error) {
+
+	roleLabels := RoleLabels{cr: r.cr, name: r.Name()}
+	labels := roleLabels.GetLabels()
+
 	if r.EnabledClusterConfig() {
 		envSecret := NewEnvSecret(ctx, r.client, r.scheme, r.cr)
 		res, err := envSecret.Reconcile(ctx)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if res.RequeueAfter > 0 {
+			return res, nil
+		}
+	}
+
+	if r.Role.Config != nil && r.Role.Config.PodDisruptionBudget != nil {
+		res, err := NewReconcilePDB(
+			r.client,
+			r.scheme,
+			r.cr,
+			r.Name(),
+			labels,
+			r.Role.Config.PodDisruptionBudget,
+		).Reconcile(ctx)
+
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -88,6 +110,21 @@ func (r *MetastoreRole) reconcileRoleGroup(
 	name string,
 	roleGroup *stackv1alpha1.RoleGroupSpec,
 ) (ctrl.Result, error) {
+
+	if roleGroup.Config != nil && roleGroup.Config.PodDisruptionBudget != nil {
+		if result, err := NewReconcileRoleGroupPDB(
+			r.client,
+			r.scheme,
+			r.cr,
+			r.Name(),
+			name,
+			roleGroup,
+		).Reconcile(ctx); err != nil {
+			return ctrl.Result{}, err
+		} else if result.RequeueAfter > 0 {
+			return result, nil
+		}
+	}
 
 	secret := NewHiveSiteSecret(ctx, r.client, r.scheme, r.cr, name, roleGroup)
 	if result, err := secret.Reconcile(ctx); err != nil {
@@ -151,11 +188,9 @@ func (r *BaseRoleGroupResourceReconciler) GetNameWithSuffix(name string) string 
 }
 
 func (r *BaseRoleGroupResourceReconciler) GetLabels() map[string]string {
-	labels := r.cr.GetLabels()
 	roleLabels := RoleLabels{cr: r.cr, name: r.roleName}
-	for k, v := range roleLabels.GetLabels() {
-		labels[k] = v
-	}
+	labels := roleLabels.GetLabels()
+
 	labels["app.kubernetes.io/instance"] = strings.ToLower(r.Name())
 	return labels
 }

@@ -107,6 +107,8 @@ type RoleSpec struct {
 
 	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups,omitempty"`
 
+	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	CommandArgsOverrides []string `json:"commandArgsOverrides,omitempty"`
 	// +kubebuilder:validation:Optional
@@ -138,11 +140,22 @@ type ConfigSpec struct {
 	Tolerations []corev1.Toleration `json:"tolerations"`
 
 	// +kubebuilder:validation:Optional
+	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="/opt/hive/data"
 	WarehouseDir string `json:"warehouseDir,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	StorageClass string `json:"storageClass,omitempty"`
+}
+
+type PodDisruptionBudgetSpec struct {
+	// +kubebuilder:validation:Optional
+	MinAvailable int32 `json:"minAvailable,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	MaxUnavailable int32 `json:"maxUnavailable,omitempty"`
 }
 
 type RoleGroupSpec struct {
