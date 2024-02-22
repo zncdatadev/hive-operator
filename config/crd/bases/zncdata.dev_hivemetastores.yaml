@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.13.0
-  name: hivemetastores.stack.zncdata.dev
+  name: hivemetastores.zncdata.dev
 spec:
-  group: stack.zncdata.dev
+  group: zncdata.dev
   names:
     kind: HiveMetastore
     listKind: HiveMetastoreList

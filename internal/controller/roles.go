@@ -2,7 +2,7 @@ package controller
 
 import (
 	"context"
-	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -13,16 +13,16 @@ type MetastoreRole struct {
 	client client.Client
 	scheme *runtime.Scheme
 
-	cr *stackv1alpha1.HiveMetastore
+	cr *hivev1alpha1.HiveMetastore
 
-	Role *stackv1alpha1.RoleSpec
+	Role *hivev1alpha1.RoleSpec
 }
 
 func NewMetastoreRole(
 	client client.Client,
 	scheme *runtime.Scheme,
-	cr *stackv1alpha1.HiveMetastore,
-	role *stackv1alpha1.RoleSpec,
+	cr *hivev1alpha1.HiveMetastore,
+	role *hivev1alpha1.RoleSpec,
 ) *MetastoreRole {
 	return &MetastoreRole{
 		client: client,
@@ -48,7 +48,7 @@ func (r *MetastoreRole) GetLabels() map[string]string {
 	}
 }
 
-func (r *MetastoreRole) MergeFromRole(roleGroup *stackv1alpha1.RoleGroupSpec) *stackv1alpha1.RoleGroupSpec {
+func (r *MetastoreRole) MergeFromRole(roleGroup *hivev1alpha1.RoleGroupSpec) *hivev1alpha1.RoleGroupSpec {
 
 	copiedRoleGroup := roleGroup.DeepCopy()
 
@@ -116,7 +116,7 @@ func (r *MetastoreRole) Reconcile(ctx context.Context) (ctrl.Result, error) {
 func (r *MetastoreRole) reconcileRoleGroup(
 	ctx context.Context,
 	name string,
-	roleGroup *stackv1alpha1.RoleGroupSpec,
+	roleGroup *hivev1alpha1.RoleGroupSpec,
 ) (ctrl.Result, error) {
 
 	if roleGroup.Config != nil && roleGroup.Config.PodDisruptionBudget != nil {
@@ -190,10 +190,10 @@ type BaseRoleGroupResourceReconciler struct {
 	client client.Client
 	scheme *runtime.Scheme
 
-	cr            *stackv1alpha1.HiveMetastore
+	cr            *hivev1alpha1.HiveMetastore
 	roleName      string
 	roleGroupName string
-	roleGroup     *stackv1alpha1.RoleGroupSpec
+	roleGroup     *hivev1alpha1.RoleGroupSpec
 }
 
 func (r *DeploymentReconciler) NameSpace() string {

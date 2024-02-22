@@ -84,7 +84,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - stack.zncdata.dev
+  - zncdata.dev
   resources:
   - hivemetastores
   verbs:
@@ -96,13 +96,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - stack.zncdata.dev
+  - zncdata.dev
   resources:
   - hivemetastores/finalizers
   verbs:
   - update
 - apiGroups:
-  - stack.zncdata.dev
+  - zncdata.dev
   resources:
   - hivemetastores/status
   verbs:

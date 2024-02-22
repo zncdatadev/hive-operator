@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	"github.com/zncdata-labs/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,12 +28,12 @@ type EnvSecret struct {
 	client client.Client
 	scheme *runtime.Scheme
 
-	cr *stackv1alpha1.HiveMetastore
+	cr *hivev1alpha1.HiveMetastore
 	s3 *S3Configuration
 	db *DatabaseConfiguration
 }
 
-func NewEnvSecret(ctx context.Context, client client.Client, scheme *runtime.Scheme, cr *stackv1alpha1.HiveMetastore) *EnvSecret {
+func NewEnvSecret(ctx context.Context, client client.Client, scheme *runtime.Scheme, cr *hivev1alpha1.HiveMetastore) *EnvSecret {
 
 	resourceClient := ResourceClient{
 		Ctx:       ctx,
@@ -55,7 +55,7 @@ func NewEnvSecret(ctx context.Context, client client.Client, scheme *runtime.Sch
 	}
 }
 
-func HiveEnvSecretName(cr *stackv1alpha1.HiveMetastore) string {
+func HiveEnvSecretName(cr *hivev1alpha1.HiveMetastore) string {
 	return cr.GetName()
 }
 
@@ -236,9 +236,9 @@ type HiveSiteSecret struct {
 	scheme *runtime.Scheme
 
 	roleGroupName string
-	roleGroup     *stackv1alpha1.RoleGroupSpec
+	roleGroup     *hivev1alpha1.RoleGroupSpec
 
-	cr *stackv1alpha1.HiveMetastore
+	cr *hivev1alpha1.HiveMetastore
 	s3 *S3Configuration
 	db *DatabaseConfiguration
 }
@@ -247,9 +247,9 @@ func NewHiveSiteSecret(
 	ctx context.Context,
 	client client.Client,
 	scheme *runtime.Scheme,
-	cr *stackv1alpha1.HiveMetastore,
+	cr *hivev1alpha1.HiveMetastore,
 	roleGroupName string,
-	roleGroup *stackv1alpha1.RoleGroupSpec,
+	roleGroup *hivev1alpha1.RoleGroupSpec,
 ) *HiveSiteSecret {
 
 	resourceClient := ResourceClient{
@@ -274,7 +274,7 @@ func NewHiveSiteSecret(
 	}
 }
 
-func HiveSiteSecretName(cr *stackv1alpha1.HiveMetastore, roleGroupName string) string {
+func HiveSiteSecretName(cr *hivev1alpha1.HiveMetastore, roleGroupName string) string {
 	return cr.GetNameWithSuffix(roleGroupName + "-hive-site")
 }
 
@@ -344,7 +344,7 @@ func (r *HiveSiteSecret) warehouseDir() string {
 	if r.roleGroup.Config != nil && r.roleGroup.Config.WarehouseDir != "" {
 		return r.roleGroup.Config.WarehouseDir
 	}
-	return stackv1alpha1.WarehouseDir
+	return hivev1alpha1.WarehouseDir
 }
 
 func (r *HiveSiteSecret) hiveSiteProperties() (map[string]string, error) {

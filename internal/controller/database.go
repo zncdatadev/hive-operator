@@ -1,7 +1,7 @@
 package controller
 
 import (
-	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	commonsv1alph1 "github.com/zncdata-labs/operator-go/pkg/apis/commons/v1alpha1"
 	"github.com/zncdata-labs/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
@@ -29,11 +29,11 @@ type DatabaseParams struct {
 }
 
 type DatabaseConfiguration struct {
-	cr             *stackv1alpha1.HiveMetastore
+	cr             *hivev1alpha1.HiveMetastore
 	ResourceClient ResourceClient
 }
 
-func NewDatabaseConfiguration(cr *stackv1alpha1.HiveMetastore, resourceClient ResourceClient) *DatabaseConfiguration {
+func NewDatabaseConfiguration(cr *hivev1alpha1.HiveMetastore, resourceClient ResourceClient) *DatabaseConfiguration {
 	return &DatabaseConfiguration{
 		cr:             cr,
 		ResourceClient: resourceClient,

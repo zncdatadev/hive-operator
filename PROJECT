@@ -16,7 +16,6 @@ resources:
     namespaced: true
   controller: true
   domain: zncdata.dev
-  group: stack
   kind: HiveMetastore
   path: github.com/zncdata-labs/hive-operator/api/v1alpha1
   version: v1alpha1
