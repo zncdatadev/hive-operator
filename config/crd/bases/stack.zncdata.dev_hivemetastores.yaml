@@ -1234,6 +1234,72 @@ spec:
                                 type: array
                             type: object
                         type: object
+                      logging:
+                        properties:
+                          metastore:
+                            properties:
+                              console:
+                                description: LogLevelSpec level mapping example |---------------------|-----------------|
+                                  |  superset log level |  zds log level  | |---------------------|-----------------|
+                                  |  CRITICAL           |  FATAL          | |  ERROR              |  ERROR          |
+                                  |  WARNING            |  WARN           | |  INFO               |  INFO           |
+                                  |  DEBUG              |  DEBUG          | |  DEBUG              |  TRACE          |
+                                  |---------------------|-----------------|
+                                properties:
+                                  level:
+                                    default: INFO
+                                    enum:
+                                    - FATAL
+                                    - ERROR
+                                    - WARN
+                                    - INFO
+                                    - DEBUG
+                                    - TRACE
+                                    type: string
+                                type: object
+                              file:
+                                description: LogLevelSpec level mapping example |---------------------|-----------------|
+                                  |  superset log level |  zds log level  | |---------------------|-----------------|
+                                  |  CRITICAL           |  FATAL          | |  ERROR              |  ERROR          |
+                                  |  WARNING            |  WARN           | |  INFO               |  INFO           |
+                                  |  DEBUG              |  DEBUG          | |  DEBUG              |  TRACE          |
+                                  |---------------------|-----------------|
+                                properties:
+                                  level:
+                                    default: INFO
+                                    enum:
+                                    - FATAL
+                                    - ERROR
+                                    - WARN
+                                    - INFO
+                                    - DEBUG
+                                    - TRACE
+                                    type: string
+                                type: object
+                              loggers:
+                                additionalProperties:
+                                  description: LogLevelSpec level mapping example
+                                    |---------------------|-----------------| |  superset
+                                    log level |  zds log level  | |---------------------|-----------------|
+                                    |  CRITICAL           |  FATAL          | |  ERROR              |  ERROR          |
+                                    |  WARNING            |  WARN           | |  INFO               |  INFO           |
+                                    |  DEBUG              |  DEBUG          | |  DEBUG              |  TRACE          |
+                                    |---------------------|-----------------|
+                                  properties:
+                                    level:
+                                      default: INFO
+                                      enum:
+                                      - FATAL
+                                      - ERROR
+                                      - WARN
+                                      - INFO
+                                      - DEBUG
+                                      - TRACE
+                                      type: string
+                                  type: object
+                                type: object
+                            type: object
+                        type: object
                       nodeSelector:
                         additionalProperties:
                           type: string
@@ -2732,6 +2798,86 @@ spec:
                                         - topologyKey
                                         type: object
                                       type: array
+                                  type: object
+                              type: object
+                            logging:
+                              properties:
+                                metastore:
+                                  properties:
+                                    console:
+                                      description: LogLevelSpec level mapping example
+                                        |---------------------|-----------------|
+                                        |  superset log level |  zds log level  |
+                                        |---------------------|-----------------|
+                                        |  CRITICAL           |  FATAL          |
+                                        |  ERROR              |  ERROR          |
+                                        |  WARNING            |  WARN           |
+                                        |  INFO               |  INFO           |
+                                        |  DEBUG              |  DEBUG          |
+                                        |  DEBUG              |  TRACE          |
+                                        |---------------------|-----------------|
+                                      properties:
+                                        level:
+                                          default: INFO
+                                          enum:
+                                          - FATAL
+                                          - ERROR
+                                          - WARN
+                                          - INFO
+                                          - DEBUG
+                                          - TRACE
+                                          type: string
+                                      type: object
+                                    file:
+                                      description: LogLevelSpec level mapping example
+                                        |---------------------|-----------------|
+                                        |  superset log level |  zds log level  |
+                                        |---------------------|-----------------|
+                                        |  CRITICAL           |  FATAL          |
+                                        |  ERROR              |  ERROR          |
+                                        |  WARNING            |  WARN           |
+                                        |  INFO               |  INFO           |
+                                        |  DEBUG              |  DEBUG          |
+                                        |  DEBUG              |  TRACE          |
+                                        |---------------------|-----------------|
+                                      properties:
+                                        level:
+                                          default: INFO
+                                          enum:
+                                          - FATAL
+                                          - ERROR
+                                          - WARN
+                                          - INFO
+                                          - DEBUG
+                                          - TRACE
+                                          type: string
+                                      type: object
+                                    loggers:
+                                      additionalProperties:
+                                        description: LogLevelSpec level mapping example
+                                          |---------------------|-----------------|
+                                          |  superset log level |  zds log level  |
+                                          |---------------------|-----------------|
+                                          |  CRITICAL           |  FATAL          |
+                                          |  ERROR              |  ERROR          |
+                                          |  WARNING            |  WARN           |
+                                          |  INFO               |  INFO           |
+                                          |  DEBUG              |  DEBUG          |
+                                          |  DEBUG              |  TRACE          |
+                                          |---------------------|-----------------|
+                                        properties:
+                                          level:
+                                            default: INFO
+                                            enum:
+                                            - FATAL
+                                            - ERROR
+                                            - WARN
+                                            - INFO
+                                            - DEBUG
+                                            - TRACE
+                                            type: string
+                                        type: object
+                                      type: object
                                   type: object
                               type: object
                             nodeSelector:

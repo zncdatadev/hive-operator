@@ -13,6 +13,8 @@ spec:
     roleGroups:
       default:
         config:
-          podDisruptionBudget:
-            minAvailable: 1
+          logging:
+            metastore:
+              console:
+                level: "INFO"
         replicas: 1

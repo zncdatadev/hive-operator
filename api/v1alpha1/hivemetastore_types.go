@@ -148,6 +148,9 @@ type ConfigSpec struct {
 
 	// +kubebuilder:validation:Optional
 	StorageClass string `json:"storageClass,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Logging *ContainerLoggingSpec `json:"logging,omitempty"`
 }
 
 type PodDisruptionBudgetSpec struct {
