@@ -2,7 +2,7 @@ package controller
 
 import (
 	"context"
-	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,18 +16,18 @@ type PVCReconciler struct {
 	client client.Client
 	scheme *runtime.Scheme
 
-	cr *stackv1alpha1.HiveMetastore
+	cr *hivev1alpha1.HiveMetastore
 
 	roleGroupName string
-	roleGroup     *stackv1alpha1.RoleGroupSpec
+	roleGroup     *hivev1alpha1.RoleGroupSpec
 }
 
 func NewPVCReconciler(
 	client client.Client,
 	scheme *runtime.Scheme,
-	cr *stackv1alpha1.HiveMetastore,
+	cr *hivev1alpha1.HiveMetastore,
 	roleGroupName string,
-	roleGroup *stackv1alpha1.RoleGroupSpec,
+	roleGroup *hivev1alpha1.RoleGroupSpec,
 ) *PVCReconciler {
 	return &PVCReconciler{
 		client:        client,
@@ -38,7 +38,7 @@ func NewPVCReconciler(
 	}
 }
 
-func HiveDataPVCName(cr *stackv1alpha1.HiveMetastore, roleGroupName string) string {
+func HiveDataPVCName(cr *hivev1alpha1.HiveMetastore, roleGroupName string) string {
 	return cr.GetNameWithSuffix(roleGroupName + "-data")
 }
 
@@ -68,7 +68,7 @@ func (r *PVCReconciler) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-func (r *PVCReconciler) storage() *stackv1alpha1.StorageResource {
+func (r *PVCReconciler) storage() *hivev1alpha1.StorageResource {
 	return r.roleGroup.Config.Resources.Storage
 }
 

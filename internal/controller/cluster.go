@@ -2,7 +2,8 @@ package controller
 
 import (
 	"context"
-	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+
+	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -12,10 +13,10 @@ type ClusterReconciler struct {
 	client client.Client
 	scheme *runtime.Scheme
 
-	cr *stackv1alpha1.HiveMetastore
+	cr *hivev1alpha1.HiveMetastore
 }
 
-func NewClusterReconciler(client client.Client, scheme *runtime.Scheme, cr *stackv1alpha1.HiveMetastore) *ClusterReconciler {
+func NewClusterReconciler(client client.Client, scheme *runtime.Scheme, cr *hivev1alpha1.HiveMetastore) *ClusterReconciler {
 	return &ClusterReconciler{
 		client: client,
 		scheme: scheme,

@@ -1,4 +1,4 @@
-apiVersion: stack.zncdata.dev/v1alpha1
+apiVersion: zncdata.dev/v1alpha1
 kind: HiveMetastore
 metadata:
   labels:

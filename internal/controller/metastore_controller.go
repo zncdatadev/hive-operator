@@ -19,7 +19,7 @@ package controller
 import (
 	"context"
 	"github.com/go-logr/logr"
-	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -37,9 +37,9 @@ type HiveMetastoreReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=stack.zncdata.dev,resources=hivemetastores,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=stack.zncdata.dev,resources=hivemetastores/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=stack.zncdata.dev,resources=hivemetastores/finalizers,verbs=update
+// +kubebuilder:rbac:groups=zncdata.dev,resources=hivemetastores,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=zncdata.dev,resources=hivemetastores/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=zncdata.dev,resources=hivemetastores/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
@@ -52,7 +52,7 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	log.Info("Reconciling instance")
 	defer log.V(2).Info("Successfully reconciled hiveMetastore")
 
-	existingInstance := &stackv1alpha1.HiveMetastore{}
+	existingInstance := &hivev1alpha1.HiveMetastore{}
 	if err := r.Get(ctx, req.NamespacedName, existingInstance); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(3).Info("Cannot find HiveMetastore instance, may have been deleted")
@@ -97,6 +97,6 @@ func (r *ResourceClient) Get(obj client.Object) error {
 // SetupWithManager sets up the controller with the Manager.
 func (r *HiveMetastoreReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&stackv1alpha1.HiveMetastore{}).
+		For(&hivev1alpha1.HiveMetastore{}).
 		Complete(r)
 }

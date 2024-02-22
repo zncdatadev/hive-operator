@@ -2,7 +2,7 @@ package controller
 
 import (
 	"context"
-	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -20,10 +20,10 @@ type DeploymentReconciler struct {
 func NewReconcileDeployment(
 	client client.Client,
 	schema *runtime.Scheme,
-	cr *stackv1alpha1.HiveMetastore,
+	cr *hivev1alpha1.HiveMetastore,
 	roleName string,
 	roleGroupName string,
-	roleGroup *stackv1alpha1.RoleGroupSpec,
+	roleGroup *hivev1alpha1.RoleGroupSpec,
 ) *DeploymentReconciler {
 
 	return &DeploymentReconciler{
@@ -38,7 +38,7 @@ func NewReconcileDeployment(
 	}
 }
 
-func (r *DeploymentReconciler) RoleGroupConfig() *stackv1alpha1.ConfigSpec {
+func (r *DeploymentReconciler) RoleGroupConfig() *hivev1alpha1.ConfigSpec {
 	return r.roleGroup.Config
 }
 
@@ -200,12 +200,12 @@ func (r *DeploymentReconciler) make() (*appsv1.Deployment, error) {
 	return dep, nil
 }
 
-func (r *DeploymentReconciler) Image() *stackv1alpha1.ImageSpec {
+func (r *DeploymentReconciler) Image() *hivev1alpha1.ImageSpec {
 	if r.cr.Spec.Image == nil {
-		return &stackv1alpha1.ImageSpec{
-			Repository: stackv1alpha1.ImageRepository,
-			Tag:        stackv1alpha1.ImageTag,
-			PullPolicy: stackv1alpha1.ImagePullPolicy,
+		return &hivev1alpha1.ImageSpec{
+			Repository: hivev1alpha1.ImageRepository,
+			Tag:        hivev1alpha1.ImageTag,
+			PullPolicy: hivev1alpha1.ImagePullPolicy,
 		}
 	}
 	return r.cr.Spec.Image
@@ -242,7 +242,7 @@ func (r *DeploymentReconciler) volumeMounts() []corev1.VolumeMount {
 	if r.EnabledDataPVC() {
 		vms = append(vms, corev1.VolumeMount{
 			Name:      r.hiveDataMountName(),
-			MountPath: stackv1alpha1.WarehouseDir,
+			MountPath: hivev1alpha1.WarehouseDir,
 		})
 	}
 
@@ -353,7 +353,7 @@ func (r *DeploymentReconciler) CheckPodsSatisfied(ctx context.Context) (bool, er
 
 func (r *DeploymentReconciler) updateStatus(status metav1.ConditionStatus, reason string, message string) error {
 	apimeta.SetStatusCondition(&r.cr.Status.Conditions, metav1.Condition{
-		Type:               stackv1alpha1.ConditionTypeClusterAvailable,
+		Type:               hivev1alpha1.ConditionTypeClusterAvailable,
 		Status:             status,
 		Reason:             reason,
 		Message:            message,

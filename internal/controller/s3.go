@@ -1,7 +1,7 @@
 package controller
 
 import (
-	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	commonsv1alpha1 "github.com/zncdata-labs/operator-go/pkg/apis/commons/v1alpha1"
 	"github.com/zncdata-labs/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
@@ -24,11 +24,11 @@ type S3Params struct {
 }
 
 type S3Configuration struct {
-	cr             *stackv1alpha1.HiveMetastore
+	cr             *hivev1alpha1.HiveMetastore
 	ResourceClient ResourceClient
 }
 
-func NewS3Configuration(cr *stackv1alpha1.HiveMetastore, resourceClient ResourceClient) *S3Configuration {
+func NewS3Configuration(cr *hivev1alpha1.HiveMetastore, resourceClient ResourceClient) *S3Configuration {
 	return &S3Configuration{
 		cr:             cr,
 		ResourceClient: resourceClient,

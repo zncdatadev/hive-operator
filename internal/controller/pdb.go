@@ -2,7 +2,7 @@ package controller
 
 import (
 	"context"
-	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -15,21 +15,21 @@ type PDBReconciler struct {
 	client client.Client
 	schema *runtime.Scheme
 
-	cr *stackv1alpha1.HiveMetastore
+	cr *hivev1alpha1.HiveMetastore
 
 	name   string
 	labels map[string]string
-	pdb    *stackv1alpha1.PodDisruptionBudgetSpec
+	pdb    *hivev1alpha1.PodDisruptionBudgetSpec
 }
 
 func NewReconcilePDB(
 	client client.Client,
 	schema *runtime.Scheme,
-	cr *stackv1alpha1.HiveMetastore,
+	cr *hivev1alpha1.HiveMetastore,
 
 	name string,
 	labels map[string]string,
-	pdb *stackv1alpha1.PodDisruptionBudgetSpec,
+	pdb *hivev1alpha1.PodDisruptionBudgetSpec,
 ) *PDBReconciler {
 
 	return &PDBReconciler{
@@ -105,11 +105,11 @@ type RoleGroupPDBReconciler struct {
 func NewReconcileRoleGroupPDB(
 	client client.Client,
 	schema *runtime.Scheme,
-	cr *stackv1alpha1.HiveMetastore,
+	cr *hivev1alpha1.HiveMetastore,
 
 	roleName string,
 	roleGroupName string,
-	roleGroup *stackv1alpha1.RoleGroupSpec,
+	roleGroup *hivev1alpha1.RoleGroupSpec,
 ) *RoleGroupPDBReconciler {
 	base := BaseRoleGroupResourceReconciler{
 		client:        client,

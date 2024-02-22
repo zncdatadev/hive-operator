@@ -2,7 +2,7 @@ package controller
 
 import (
 	"context"
-	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,15 +16,15 @@ type ServiceReconciler struct {
 	client client.Client
 	scheme *runtime.Scheme
 
-	cr        *stackv1alpha1.HiveMetastore
-	roleGroup *stackv1alpha1.RoleGroupSpec
+	cr        *hivev1alpha1.HiveMetastore
+	roleGroup *hivev1alpha1.RoleGroupSpec
 }
 
 func NewReconcileService(
 	client client.Client,
 	schema *runtime.Scheme,
-	cr *stackv1alpha1.HiveMetastore,
-	roleGroup *stackv1alpha1.RoleGroupSpec,
+	cr *hivev1alpha1.HiveMetastore,
+	roleGroup *hivev1alpha1.RoleGroupSpec,
 ) *ServiceReconciler {
 	return &ServiceReconciler{
 		client:    client,

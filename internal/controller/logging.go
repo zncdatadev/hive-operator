@@ -2,7 +2,7 @@ package controller
 
 import (
 	"context"
-	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -107,10 +107,10 @@ type MetastoreLoggingRecociler struct {
 func NewLog4jConfigMapRecociler(
 	client client.Client,
 	scheme *runtime.Scheme,
-	cr *stackv1alpha1.HiveMetastore,
+	cr *hivev1alpha1.HiveMetastore,
 	roleName string,
 	roleGroupName string,
-	roleGroup *stackv1alpha1.RoleGroupSpec,
+	roleGroup *hivev1alpha1.RoleGroupSpec,
 ) *MetastoreLoggingRecociler {
 	return &MetastoreLoggingRecociler{
 		BaseRoleGroupResourceReconciler{
@@ -124,7 +124,7 @@ func NewLog4jConfigMapRecociler(
 	}
 }
 
-func MetastoreLog4jConfigMapName(cr *stackv1alpha1.HiveMetastore, roleGroupName string) string {
+func MetastoreLog4jConfigMapName(cr *hivev1alpha1.HiveMetastore, roleGroupName string) string {
 	return cr.GetNameWithSuffix(roleGroupName + "-log4j2")
 }
 
@@ -198,7 +198,7 @@ func (r *MetastoreLoggingRecociler) apply(ctx context.Context) (ctrl.Result, err
 	return ctrl.Result{}, nil
 }
 
-func (r *MetastoreLoggingRecociler) metastoreLog4j(loggingConfig *stackv1alpha1.LoggingConfigSpec) string {
+func (r *MetastoreLoggingRecociler) metastoreLog4j(loggingConfig *hivev1alpha1.LoggingConfigSpec) string {
 	properties := make(map[string]string)
 
 	if loggingConfig.Loggers != nil {

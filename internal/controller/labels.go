@@ -1,12 +1,12 @@
 package controller
 
 import (
-	stackv1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	"strings"
 )
 
 type RoleLabels struct {
-	cr   *stackv1alpha1.HiveMetastore
+	cr   *hivev1alpha1.HiveMetastore
 	name string
 }
 
