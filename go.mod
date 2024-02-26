@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/cisco-open/k8s-objectmatcher v1.9.0
-	github.com/go-logr/logr v1.3.0
+	github.com/go-logr/logr v1.4.1
 	github.com/onsi/ginkgo/v2 v2.13.0
 	github.com/onsi/gomega v1.29.0
 	github.com/zncdata-labs/operator-go v0.3.1-0.20240207065046-99c633403e4b
