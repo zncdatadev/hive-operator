@@ -113,8 +113,8 @@ github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXl
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
-github.com/zncdata-labs/operator-go v0.3.1-0.20240207065046-99c633403e4b h1:YjnntAZRmmDDe9eCYdSOZUTqTW3jMz7jK2S5Aqn+3Zw=
-github.com/zncdata-labs/operator-go v0.3.1-0.20240207065046-99c633403e4b/go.mod h1:y5EDDKn3tt5X9RiO+xsVAw26Xk65bdO1j3R0w1MA5d4=
+github.com/zncdata-labs/operator-go v0.4.0 h1:R4GUEsOn6PaDhTB0z4NvZrnKRQLiR2bdPyVpCzsIFTw=
+github.com/zncdata-labs/operator-go v0.4.0/go.mod h1:y5EDDKn3tt5X9RiO+xsVAw26Xk65bdO1j3R0w1MA5d4=
 go.uber.org/atomic v1.7.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
 go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=

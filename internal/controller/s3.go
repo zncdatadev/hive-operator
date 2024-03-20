@@ -3,7 +3,6 @@ package controller
 import (
 	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	commonsv1alpha1 "github.com/zncdata-labs/operator-go/pkg/apis/commons/v1alpha1"
-	"github.com/zncdata-labs/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -85,14 +84,10 @@ func (s *S3Configuration) GetCredential(name string) (*S3Credential, error) {
 	if err := s.ResourceClient.Get(secret); err != nil {
 		return nil, err
 	}
-	ak, err := util.Base64[[]byte]{Data: secret.Data[S3AccessKeyName]}.Decode()
-	if err != nil {
-		return nil, err
-	}
-	sk, err := util.Base64[[]byte]{Data: secret.Data[S3SecretKeyName]}.Decode()
-	if err != nil {
-		return nil, err
-	}
+	ak := secret.Data[S3AccessKeyName]
+
+	sk := secret.Data[S3SecretKeyName]
+
 	return &S3Credential{
 		AccessKey: string(ak),
 		SecretKey: string(sk),
