@@ -6,7 +6,6 @@ import (
 	"time"
 
 	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
-	"github.com/zncdata-labs/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -181,7 +180,7 @@ func (r *EnvSecret) databaseSecretData() (map[string]string, error) {
 func (r *EnvSecret) make(data map[string]string) (corev1.Secret, error) {
 	encodedData := make(map[string][]byte)
 	for k, v := range data {
-		encodedData[k] = []byte(util.Base64[string]{Data: v}.Encode())
+		encodedData[k] = []byte(v)
 	}
 	obj := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

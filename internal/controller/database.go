@@ -1,12 +1,12 @@
 package controller
 
 import (
+	"strconv"
+
 	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	commonsv1alph1 "github.com/zncdata-labs/operator-go/pkg/apis/commons/v1alpha1"
-	"github.com/zncdata-labs/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strconv"
 )
 
 const (
@@ -92,15 +92,9 @@ func (d *DatabaseConfiguration) GetCredential(name string) (*DatabaseCredential,
 		return nil, err
 	}
 
-	username, err := util.Base64[[]byte]{Data: secret.Data[DbUsernameName]}.Decode()
-	if err != nil {
-		return nil, err
-	}
+	username := secret.Data[DbUsernameName]
 
-	password, err := util.Base64[[]byte]{Data: secret.Data[DbPasswordName]}.Decode()
-	if err != nil {
-		return nil, err
-	}
+	password := secret.Data[DbPasswordName]
 
 	return &DatabaseCredential{
 		Username: string(username),
