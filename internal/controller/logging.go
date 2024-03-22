@@ -2,6 +2,8 @@ package controller
 
 import (
 	"context"
+	"time"
+
 	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -9,7 +11,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"time"
 )
 
 const (
@@ -205,7 +206,7 @@ func (r *MetastoreLoggingRecociler) metastoreLog4j(loggingConfig *hivev1alpha1.L
 		for k, level := range loggingConfig.Loggers {
 			if level != nil {
 				v := *level
-				properties["logger."+k+"level"] = v.Level
+				properties["logger."+k+".level"] = v.Level
 			}
 		}
 	}
