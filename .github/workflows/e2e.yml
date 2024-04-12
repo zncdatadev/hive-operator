@@ -1,0 +1,36 @@
+# e2e test
+
+name: e2e-test
+
+on: ['push', 'pull_request']
+
+jobs:
+  chainsaw-test:
+    name: Chainsaw Test
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        k8s-version: ['1.26.14', '1.27.11']
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache: false
+
+    - name: Create KinD cluster
+      env:
+        KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        ENVTEST_K8S_VERSION: ${{ matrix.k8s-version}}
+      run: make kind-create
+    - name: Chainsaw test setup
+      env:
+        KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+      run: make chainsaw-setup
+    - name: Test with Chainsaw
+      env:
+        KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+      run: make chainsaw-test

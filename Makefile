@@ -55,7 +55,7 @@ OPERATOR_SDK_VERSION ?= v1.33.0
 # Image URL to use all building/pushing image targets
 IMG ?= $(REGISTRY)/hive-operator:v$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.26.0
+ENVTEST_K8S_VERSION ?= 1.26.14
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -292,3 +292,81 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+
+##@ E2E
+
+# kind
+KIND_VERSION ?= v0.22.0
+
+KIND_KUBECONFIG ?= ./kind-kubeconfig
+KIND_CLUSTER_NAME ?= ${PROJECT_NAME}
+
+.PHONY: kind
+KIND = $(LOCALBIN)/kind
+kind: ## Download kind locally if necessary.
+ifeq (,$(shell which $(KIND)))
+ifeq (,$(shell which kind 2>/dev/null))
+	@{ \
+	set -e ;\
+	go install sigs.k8s.io/kind@$(KIND_VERSION) ;\
+	}
+KIND = $(GOBIN)/bin/kind
+else
+KIND = $(shell which kind)
+endif
+endif
+
+OLM_VERSION ?= v0.27.0
+
+# Create a kind cluster, install ingress-nginx, and wait for it to be available.
+.PHONY: kind-create
+kind-create: kind ## Create a kind cluster.
+	$(KIND) create cluster --config test/e2e/kind-$(ENVTEST_K8S_VERSION).yaml --name $(KIND_CLUSTER_NAME) --kubeconfig $(KIND_KUBECONFIG) --wait 120s
+	make kind-setup KUBECONFIG=$(KIND_KUBECONFIG)
+
+.PHONY: kind-setup
+kind-setup: kind ## setup kind cluster base environment
+	@echo "\nSetup kind cluster base environment, install ingress-nginx and OLM"
+	kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+	kubectl -n ingress-nginx wait deployment ingress-nginx-controller --for=condition=available --timeout=300s
+	curl -sSL https://github.com/operator-framework/operator-lifecycle-manager/releases/download/$(OLM_VERSION)/install.sh | bash -s $(OLM_VERSION)
+
+.PHONY: kind-delete
+kind-delete: kind ## Delete a kind cluster.
+	$(KIND) delete cluster --name $(KIND_CLUSTER_NAME)
+
+# chainsaw
+
+CHAINSAW_VERSION ?= v0.1.8
+
+.PHONY: chainsaw
+CHAINSAW = $(LOCALBIN)/chainsaw
+chainsaw: ## Download chainsaw locally if necessary.
+ifeq (,$(shell which $(CHAINSAW)))
+ifeq (,$(shell which chainsaw 2>/dev/null))
+	@{ \
+	set -e ;\
+	go install github.com/kyverno/chainsaw@$(CHAINSAW_VERSION) ;\
+	}
+CHAINSAW = $(GOBIN)/chainsaw
+else
+CHAINSAW = $(shell which chainsaw)
+endif
+endif
+
+.PHONY: chainsaw-setup
+chainsaw-setup: manifests kustomize ## Run the chainsaw setup
+	@echo "\nSetup chainsaw test environment"
+	make docker-build
+	$(KIND) --name $(KIND_CLUSTER_NAME) load docker-image $(IMG)
+	make deploy KUBECONFIG=$(KIND_KUBECONFIG)
+
+.PHONY: chainsaw-test
+chainsaw-test: chainsaw ## Run the chainsaw test
+	$(CHAINSAW) test --cluster cluster-1=$(KIND_KUBECONFIG) --test-dir ./test/e2e --assert-timeout 120s --cleanup-timeout 120s --delete-timeout 120s
+
+
+.PHONY: chainsaw-cleanup
+chainsaw-cleanup: manifests kustomize ## Run the chainsaw cleanup
+	make undeploy KUBECONFIG=$(KIND_KUBECONFIG)

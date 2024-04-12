@@ -1,0 +1,20 @@
+apiVersion: zncdata.dev/v1alpha1
+kind: HiveMetastore
+metadata:
+  labels:
+    app.kubernetes.io/name: hivemetastore
+    app.kubernetes.io/instance: hivemetastore-sample
+    app.kubernetes.io/part-of: hive-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: hive-operator
+  name: hivemetastore-sample
+spec:
+  metastore:
+    roleGroups:
+      default:
+        config:
+          logging:
+            metastore:
+              console:
+                level: "INFO"
+        replicas: 1
