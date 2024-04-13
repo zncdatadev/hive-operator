@@ -25,13 +25,14 @@ endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 REGISTRY ?= quay.io/zncdata
+PROJECT_NAME = spark-k8s-operator
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # zncdata.dev/hive-operator-bundle:$VERSION and zncdata.dev/hive-operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= $(REGISTRY)/hive-operator
+IMAGE_TAG_BASE ?= $(REGISTRY)/$(PROJECT_NAME)
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
@@ -323,7 +324,7 @@ OLM_VERSION ?= v0.27.0
 .PHONY: kind-create
 kind-create: kind ## Create a kind cluster.
 	$(KIND) create cluster --config test/e2e/kind-$(ENVTEST_K8S_VERSION).yaml --name $(KIND_CLUSTER_NAME) --kubeconfig $(KIND_KUBECONFIG) --wait 120s
-	make kind-setup KUBECONFIG=$(KIND_KUBECONFIG)
+	# make kind-setup KUBECONFIG=$(KIND_KUBECONFIG)
 
 .PHONY: kind-setup
 kind-setup: kind ## setup kind cluster base environment
