@@ -17,20 +17,21 @@ jobs:
       with:
         go-version: '1.21'
         cache: false
-
     - name: Create KinD cluster
       env:
+        KINDTEST_K8S_VERSION: ${{ matrix.k8s-version}}
         KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
         KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
-        ENVTEST_K8S_VERSION: ${{ matrix.k8s-version}}
       run: make kind-create
     - name: Chainsaw test setup
       env:
+        KINDTEST_K8S_VERSION: ${{ matrix.k8s-version }}
         KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
         KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
       run: make chainsaw-setup
     - name: Test with Chainsaw
       env:
+        KINDTEST_K8S_VERSION: ${{ matrix.k8s-version }}
         KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
         KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
       run: make chainsaw-test
