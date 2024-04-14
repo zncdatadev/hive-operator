@@ -43,20 +43,20 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	cfg        *rest.Config
-	k8sClient  client.Client
-	testEnv    *envtest.Environment
-	ctx        context.Context
-	cancel     context.CancelFunc
-	k8sVersion string
+	cfg            *rest.Config
+	k8sClient      client.Client
+	testEnv        *envtest.Environment
+	ctx            context.Context
+	cancel         context.CancelFunc
+	testK8sVersion string
 )
 
 func TestAPIs(t *testing.T) {
-	k8sVersion = os.Getenv("K8S_VERSION")
+	testK8sVersion = os.Getenv("ENVTEST_K8S_VERSION")
 
-	if k8sVersion == "" {
-		logf.Log.Info("K8S_VERSION not set, using default version 1.26.0")
-		k8sVersion = "1.26.0"
+	if testK8sVersion == "" {
+		logf.Log.Info("ENVTEST_K8S_VERSION not set, using default version 1.26.1")
+		testK8sVersion = "1.26.1"
 	}
 
 	RegisterFailHandler(Fail)
@@ -71,7 +71,7 @@ var _ = BeforeSuite(func() {
 
 	Expect(os.Setenv(
 		"KUBEBUILDER_ASSETS",
-		fmt.Sprintf("../../bin/k8s/%s-%s-%s", k8sVersion, runtime.GOOS, runtime.GOARCH),
+		fmt.Sprintf("../../bin/k8s/%s-%s-%s", testK8sVersion, runtime.GOOS, runtime.GOARCH),
 	)).To(Succeed())
 
 	testEnv = &envtest.Environment{

@@ -121,3 +121,5 @@ Temporary Items
 
 bundle
 bundle.Dockerfile
+
+kind-kubeconfig*

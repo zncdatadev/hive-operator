@@ -2,11 +2,12 @@ package controller
 
 import (
 	"context"
+	"strings"
+
 	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 type MetastoreRole struct {
@@ -149,7 +150,7 @@ func (r *MetastoreRole) reconcileRoleGroup(
 		return result, nil
 	}
 
-	if result, err := NewReconcileService(r.client, r.scheme, r.cr, roleGroup).Reconcile(ctx); err != nil {
+	if result, err := NewReconcileService(r.client, r.scheme, r.cr, roleGroup, name).Reconcile(ctx); err != nil {
 		return ctrl.Result{}, err
 	} else if result.RequeueAfter > 0 {
 		return result, nil

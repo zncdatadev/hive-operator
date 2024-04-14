@@ -145,3 +145,5 @@ Temporary Items
 # olm
 bundle
 bundle.Dockerfile
+
+kind-kubeconfig*
