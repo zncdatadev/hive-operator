@@ -100,9 +100,11 @@ func (r *MetastoreRole) Reconcile(ctx context.Context) (ctrl.Result, error) {
 		}
 	}
 
+	stop := r.shouldStop()
+
 	for name, rg := range r.Role.RoleGroups {
 		mergedRg := r.MergeFromRole(rg)
-		res, err := r.reconcileRoleGroup(ctx, name, mergedRg)
+		res, err := r.reconcileRoleGroup(ctx, name, mergedRg, stop)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -114,10 +116,15 @@ func (r *MetastoreRole) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
+func (r *MetastoreRole) shouldStop() bool {
+	return r.cr.Spec.ClusterOperation != nil && r.cr.Spec.ClusterOperation.Stopped
+}
+
 func (r *MetastoreRole) reconcileRoleGroup(
 	ctx context.Context,
 	name string,
 	roleGroup *hivev1alpha1.RoleGroupSpec,
+	stop bool,
 ) (ctrl.Result, error) {
 
 	if roleGroup.Config != nil && roleGroup.Config.PodDisruptionBudget != nil {
@@ -176,6 +183,7 @@ func (r *MetastoreRole) reconcileRoleGroup(
 		r.Name(), // roleName
 		name,     // roleGroupName
 		roleGroup,
+		stop,
 	)
 
 	if result, err := deployment.Reconcile(ctx); err != nil {
@@ -195,6 +203,7 @@ type BaseRoleGroupResourceReconciler struct {
 	roleName      string
 	roleGroupName string
 	roleGroup     *hivev1alpha1.RoleGroupSpec
+	stop          bool
 }
 
 func (r *DeploymentReconciler) NameSpace() string {

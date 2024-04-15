@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+
 	"github.com/go-logr/logr"
 	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -64,6 +65,11 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	log.V(2).Info("HiveMetastore found", "Name", existingInstance.Name)
 
+	if r.ReconciliationPaused(ctx, existingInstance) {
+		log.V(0).Info("Reconciliation paused")
+		return ctrl.Result{}, nil
+	}
+
 	result, err := NewClusterReconciler(r.Client, r.Scheme, existingInstance).Reconcile(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -92,6 +98,10 @@ func (r *ResourceClient) Get(obj client.Object) error {
 		return err
 	}
 	return nil
+}
+
+func (r *HiveMetastoreReconciler) ReconciliationPaused(ctx context.Context, instance *hivev1alpha1.HiveMetastore) bool {
+	return instance.Spec.ClusterOperation != nil && instance.Spec.ClusterOperation.ReconciliationPaused
 }
 
 // SetupWithManager sets up the controller with the Manager.
