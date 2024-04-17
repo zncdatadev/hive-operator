@@ -2,6 +2,8 @@ package controller
 
 import (
 	"context"
+	"time"
+
 	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -10,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 type DeploymentReconciler struct {
@@ -24,6 +25,7 @@ func NewReconcileDeployment(
 	roleName string,
 	roleGroupName string,
 	roleGroup *hivev1alpha1.RoleGroupSpec,
+	stop bool,
 ) *DeploymentReconciler {
 
 	return &DeploymentReconciler{
@@ -34,12 +36,23 @@ func NewReconcileDeployment(
 			roleName:      roleName,
 			roleGroupName: roleGroupName,
 			roleGroup:     roleGroup,
+			stop:          stop,
 		},
 	}
 }
 
 func (r *DeploymentReconciler) RoleGroupConfig() *hivev1alpha1.ConfigSpec {
 	return r.roleGroup.Config
+}
+
+func (d *DeploymentReconciler) getTerminationGracePeriodSeconds() *int64 {
+	if d.roleGroup.Config.GracefulShutdownTimeout != nil {
+		if tiime, err := time.ParseDuration(*d.roleGroup.Config.GracefulShutdownTimeout); err == nil {
+			seconds := int64(tiime.Seconds())
+			return &seconds
+		}
+	}
+	return nil
 }
 
 func (r *DeploymentReconciler) Reconcile(ctx context.Context) (ctrl.Result, error) {
@@ -150,8 +163,12 @@ func (r *DeploymentReconciler) volumes() []corev1.Volume {
 	return vs
 }
 
-func (r *DeploymentReconciler) make() (*appsv1.Deployment, error) {
+func (r *DeploymentReconciler) replicas() int32 {
+	return r.roleGroup.Replicas
+}
 
+func (r *DeploymentReconciler) make() (*appsv1.Deployment, error) {
+	replicas := r.replicas()
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.Name(),
@@ -159,7 +176,7 @@ func (r *DeploymentReconciler) make() (*appsv1.Deployment, error) {
 			Labels:    r.GetLabels(),
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &r.roleGroup.Replicas,
+			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: r.GetLabels(),
 			},
@@ -171,7 +188,8 @@ func (r *DeploymentReconciler) make() (*appsv1.Deployment, error) {
 					Containers: []corev1.Container{
 						r.metastoreContainer(),
 					},
-					Volumes: r.volumes(),
+					Volumes:                       r.volumes(),
+					TerminationGracePeriodSeconds: r.getTerminationGracePeriodSeconds(),
 				},
 			},
 		},

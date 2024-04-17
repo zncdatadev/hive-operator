@@ -71,6 +71,9 @@ type HiveMetastoreSpec struct {
 	// +kubebuilder:validation:Optional
 	ClusterConfig *ClusterConfigSpec `json:"clusterConfig,omitempty"`
 
+	// +kubebuilder:validation:Optional
+	ClusterOperation *ClusterOperationSpec `json:"clusterOperation,omitempty"`
+
 	// +kubebuilder:validation:Required
 	Metastore *RoleSpec `json:"metastore"`
 }
@@ -84,6 +87,16 @@ type ClusterConfigSpec struct {
 
 	// +kubebuilder:validation:Optional
 	Listener *ListenerSpec `json:"listener,omitempty"`
+}
+
+type ClusterOperationSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=false
+	ReconciliationPaused bool `json:"reconciliationPaused,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=false
+	Stopped bool `json:"stopped,omitempty"`
 }
 
 type ListenerSpec struct {
@@ -107,6 +120,7 @@ type RoleSpec struct {
 
 	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups,omitempty"`
 
+	// +kubebuilder:validation:Optional
 	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -141,6 +155,10 @@ type ConfigSpec struct {
 
 	// +kubebuilder:validation:Optional
 	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
+
+	// Use time.ParseDuration to parse the string
+	// +kubebuilder:validation:Optional
+	GracefulShutdownTimeout *string `json:"gracefulShutdownTimeout,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="/opt/hive/data"

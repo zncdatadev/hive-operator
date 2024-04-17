@@ -126,6 +126,15 @@ spec:
                     - reference
                     type: object
                 type: object
+              clusterOperation:
+                properties:
+                  reconciliationPaused:
+                    default: false
+                    type: boolean
+                  stopped:
+                    default: false
+                    type: boolean
+                type: object
               image:
                 properties:
                   pullPolicy:
@@ -1234,6 +1243,9 @@ spec:
                                 type: array
                             type: object
                         type: object
+                      gracefulShutdownTimeout:
+                        description: Use time.ParseDuration to parse the string
+                        type: string
                       logging:
                         properties:
                           metastore:
@@ -2800,6 +2812,9 @@ spec:
                                       type: array
                                   type: object
                               type: object
+                            gracefulShutdownTimeout:
+                              description: Use time.ParseDuration to parse the string
+                              type: string
                             logging:
                               properties:
                                 metastore:
