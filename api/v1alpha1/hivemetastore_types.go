@@ -129,8 +129,8 @@ type RoleSpec struct {
 	ConfigOverrides *ConfigOverridesSpec `json:"configOverrides,omitempty"`
 	// +kubebuilder:validation:Optional
 	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
-	//// +kubebuilder:validation:Optional
-	//PodOverride corev1.PodSpec `json:"podOverride,omitempty"`
+	// +kubebuilder:validation:Optional
+	PodOverride *corev1.PodTemplateSpec `json:"podOverride,omitempty"`
 }
 
 type ConfigOverridesSpec struct {
@@ -192,8 +192,8 @@ type RoleGroupSpec struct {
 	ConfigOverrides *ConfigOverridesSpec `json:"configOverrides,omitempty"`
 	// +kubebuilder:validation:Optional
 	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
-	//// +kubebuilder:validation:Optional
-	//PodOverride corev1.PodSpec `json:"podOverride,omitempty"`
+	// +kubebuilder:validation:Optional
+	PodOverride *corev1.PodTemplateSpec `json:"podOverride,omitempty"`
 }
 
 type DatabaseSpec struct {

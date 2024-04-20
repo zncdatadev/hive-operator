@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
@@ -103,6 +104,32 @@ func (r *DeploymentReconciler) log4jMountName() string {
 	return "hive-log4j2"
 }
 
+func (d *DeploymentReconciler) getPodTemplate() corev1.PodTemplateSpec {
+	copyedPodTemplate := d.roleGroup.PodOverride.DeepCopy()
+	podTemplate := corev1.PodTemplateSpec{}
+
+	if copyedPodTemplate != nil {
+		podTemplate = *copyedPodTemplate
+	}
+
+	if podTemplate.ObjectMeta.Labels == nil {
+		podTemplate.ObjectMeta.Labels = make(map[string]string)
+	}
+
+	maps.Copy(podTemplate.ObjectMeta.Labels, d.GetLabels())
+
+	podTemplate.Spec.Containers = append(podTemplate.Spec.Containers, d.createContainer())
+
+	podTemplate.Spec.Volumes = append(podTemplate.Spec.Volumes, d.createVolumes()...)
+
+	seconds := d.getTerminationGracePeriodSeconds()
+	if d.roleGroup.Config.GracefulShutdownTimeout != nil {
+		podTemplate.Spec.TerminationGracePeriodSeconds = seconds
+	}
+
+	return podTemplate
+}
+
 func (r *DeploymentReconciler) metastoreConfigMapName() string {
 	return MetastoreLog4jConfigMapName(r.cr, r.roleGroupName)
 }
@@ -112,7 +139,7 @@ func (r *DeploymentReconciler) hiveDataMountName() string {
 }
 
 // volumes returns the volumes for the deployment
-func (r *DeploymentReconciler) volumes() []corev1.Volume {
+func (r *DeploymentReconciler) createVolumes() []corev1.Volume {
 	vs := []corev1.Volume{
 		{
 			Name: r.hiveSiteMountName(),
@@ -168,6 +195,7 @@ func (r *DeploymentReconciler) replicas() int32 {
 }
 
 func (r *DeploymentReconciler) make() (*appsv1.Deployment, error) {
+	podTemplate := r.getPodTemplate()
 	replicas := r.replicas()
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -180,18 +208,7 @@ func (r *DeploymentReconciler) make() (*appsv1.Deployment, error) {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: r.GetLabels(),
 			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: r.GetLabels(),
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						r.metastoreContainer(),
-					},
-					Volumes:                       r.volumes(),
-					TerminationGracePeriodSeconds: r.getTerminationGracePeriodSeconds(),
-				},
-			},
+			Template: podTemplate,
 		},
 	}
 
@@ -306,7 +323,7 @@ func (r *DeploymentReconciler) overrideEnv() []corev1.EnvVar {
 	return envs
 }
 
-func (r *DeploymentReconciler) metastoreContainer() corev1.Container {
+func (r *DeploymentReconciler) createContainer() corev1.Container {
 
 	image := r.Image()
 
