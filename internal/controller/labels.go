@@ -1,7 +1,7 @@
 package controller
 
 import (
-	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
 	"strings"
 )
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2023 zncdata-labs.
+Copyright 2023 zncdatadev.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	hivev1alpha1 "github.com/zncdata-labs/hive-operator/api/v1alpha1"
+	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
 )
 
 var _ = Describe("HiveMetastore controller", func() {

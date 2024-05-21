@@ -41,11 +41,11 @@ spec:
   - metastore
   links:
   - name: Hive Operator
-    url: https://github.com/zncdata-labs/hive-operator
+    url: https://github.com/zncdatadev/hive-operator
   - name: Apache Hive
     url: https://hive.apache.org/
   maturity: alpha
   provider:
-    name: zncdata-labs
-    url: https://github.com/zncdata-labs
+    name: zncdatadev
+    url: https://github.com/zncdatadev
   version: 0.0.0

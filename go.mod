@@ -1,4 +1,4 @@
-module github.com/zncdata-labs/hive-operator
+module github.com/zncdatadev/hive-operator
 
 go 1.21
 
@@ -7,7 +7,7 @@ require (
 	github.com/go-logr/logr v1.4.1
 	github.com/onsi/ginkgo/v2 v2.17.2
 	github.com/onsi/gomega v1.33.1
-	github.com/zncdata-labs/operator-go v0.4.0
+	github.com/zncdatadev/operator-go v0.5.0
 	k8s.io/api v0.29.3
 	k8s.io/apimachinery v0.29.3
 	k8s.io/client-go v0.29.3
