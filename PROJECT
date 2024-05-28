@@ -9,7 +9,7 @@ plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: hive-operator
-repo: github.com/zncdata-labs/hive-operator
+repo: github.com/zncdatadev/hive-operator
 resources:
 - api:
     crdVersion: v1
@@ -17,6 +17,6 @@ resources:
   controller: true
   domain: zncdata.dev
   kind: HiveMetastore
-  path: github.com/zncdata-labs/hive-operator/api/v1alpha1
+  path: github.com/zncdatadev/hive-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

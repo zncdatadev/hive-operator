@@ -89,7 +89,7 @@ jobs:
 
   deploy-operator:
     name: Deploy operator
-    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository_owner == 'zncdata-labs'
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository_owner == 'zncdatadev'
     runs-on: ubuntu-22.04
     needs:
     - golang-test
