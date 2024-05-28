@@ -5,6 +5,12 @@ import (
 	"strings"
 )
 
+const (
+	LabelCrName    = "app.kubernetes.io/Name"
+	LabelComponent = "app.kubernetes.io/component"
+	LabelManagedBy = "app.kubernetes.io/managed-by"
+)
+
 type RoleLabels struct {
 	cr   *hivev1alpha1.HiveMetastore
 	name string
@@ -12,8 +18,8 @@ type RoleLabels struct {
 
 func (r *RoleLabels) GetLabels() map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name":       strings.ToLower(r.cr.Name),
-		"app.kubernetes.io/component":  r.name,
-		"app.kubernetes.io/managed-by": "hive-operator",
+		LabelCrName:    strings.ToLower(r.cr.Name),
+		LabelComponent: r.name,
+		LabelManagedBy: "hive-operator",
 	}
 }
