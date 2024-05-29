@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"maps"
+	"strings"
 	"time"
 
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
@@ -46,9 +47,9 @@ func (r *DeploymentReconciler) RoleGroupConfig() *hivev1alpha1.ConfigSpec {
 	return r.roleGroup.Config
 }
 
-func (d *DeploymentReconciler) getTerminationGracePeriodSeconds() *int64 {
-	if d.roleGroup.Config.GracefulShutdownTimeout != nil {
-		if tiime, err := time.ParseDuration(*d.roleGroup.Config.GracefulShutdownTimeout); err == nil {
+func (r *DeploymentReconciler) getTerminationGracePeriodSeconds() *int64 {
+	if r.roleGroup.Config.GracefulShutdownTimeout != nil {
+		if tiime, err := time.ParseDuration(*r.roleGroup.Config.GracefulShutdownTimeout); err == nil {
 			seconds := int64(tiime.Seconds())
 			return &seconds
 		}
@@ -104,8 +105,8 @@ func (r *DeploymentReconciler) log4jMountName() string {
 	return "hive-log4j2"
 }
 
-func (d *DeploymentReconciler) getPodTemplate() corev1.PodTemplateSpec {
-	copyedPodTemplate := d.roleGroup.PodOverride.DeepCopy()
+func (r *DeploymentReconciler) getPodTemplate() corev1.PodTemplateSpec {
+	copyedPodTemplate := r.roleGroup.PodOverride.DeepCopy()
 	podTemplate := corev1.PodTemplateSpec{}
 
 	if copyedPodTemplate != nil {
@@ -116,14 +117,14 @@ func (d *DeploymentReconciler) getPodTemplate() corev1.PodTemplateSpec {
 		podTemplate.ObjectMeta.Labels = make(map[string]string)
 	}
 
-	maps.Copy(podTemplate.ObjectMeta.Labels, d.GetLabels())
+	maps.Copy(podTemplate.ObjectMeta.Labels, r.GetLabels())
 
-	podTemplate.Spec.Containers = append(podTemplate.Spec.Containers, d.createContainer())
+	podTemplate.Spec.Containers = append(podTemplate.Spec.Containers, r.createContainer())
 
-	podTemplate.Spec.Volumes = append(podTemplate.Spec.Volumes, d.createVolumes()...)
+	podTemplate.Spec.Volumes = append(podTemplate.Spec.Volumes, r.createVolumes()...)
 
-	seconds := d.getTerminationGracePeriodSeconds()
-	if d.roleGroup.Config.GracefulShutdownTimeout != nil {
+	seconds := r.getTerminationGracePeriodSeconds()
+	if r.roleGroup.Config.GracefulShutdownTimeout != nil {
 		podTemplate.Spec.TerminationGracePeriodSeconds = seconds
 	}
 
@@ -213,9 +214,7 @@ func (r *DeploymentReconciler) make() (*appsv1.Deployment, error) {
 	}
 
 	if r.RoleGroupConfig() != nil {
-		if r.RoleGroupConfig().Affinity != nil {
-			dep.Spec.Template.Spec.Affinity = r.RoleGroupConfig().Affinity
-		}
+		r.addAffinity(dep)
 
 		if r.RoleGroupConfig().Tolerations != nil {
 			dep.Spec.Template.Spec.Tolerations = r.RoleGroupConfig().Tolerations
@@ -233,6 +232,33 @@ func (r *DeploymentReconciler) make() (*appsv1.Deployment, error) {
 	}
 
 	return dep, nil
+}
+
+func (r *DeploymentReconciler) addAffinity(dep *appsv1.Deployment) {
+	var affinity *corev1.Affinity
+	if r.RoleGroupConfig().Affinity != nil {
+		affinity = r.RoleGroupConfig().Affinity
+	} else {
+		affinity = &corev1.Affinity{
+			PodAntiAffinity: &corev1.PodAntiAffinity{
+				PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+					{
+						Weight: 70,
+						PodAffinityTerm: corev1.PodAffinityTerm{
+							TopologyKey: corev1.LabelHostname,
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									LabelCrName:    strings.ToLower(r.cr.Name),
+									LabelComponent: r.roleName,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+	dep.Spec.Template.Spec.Affinity = affinity
 }
 
 func (r *DeploymentReconciler) Image() *hivev1alpha1.ImageSpec {
