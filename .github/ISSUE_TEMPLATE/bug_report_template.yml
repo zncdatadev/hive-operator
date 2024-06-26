@@ -15,13 +15,14 @@ body:
       placeholder: Bug description
     validations:
       required: true
-  - type: checkboxes
+  - type: dropdown
     attributes:
-      label: Have you searched existing issues?  🔎
-      description: Please search to see if an issue already exists for the issue you encountered.
+      label: Duplicates
+      description: Please [search the history](https://github.com/zncdatadev/trino-operator/issues) to see if an issue already exists for the same problem.
       options:
-        - label: I have searched and found no existing issues
-          required: true
+        - no check
+        - I have searched the existing issues
+      default: 0
   - type: textarea
     id: reproduction
     attributes:
