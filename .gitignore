@@ -147,3 +147,4 @@ bundle
 bundle.Dockerfile
 
 kind-kubeconfig*
+kind-config-local.yaml

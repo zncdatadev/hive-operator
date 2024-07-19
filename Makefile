@@ -335,6 +335,7 @@ KIND_IMAGE ?= kindest/node:v${KINDTEST_K8S_VERSION}
 
 KIND_KUBECONFIG ?= ./kind-kubeconfig-$(KINDTEST_K8S_VERSION)
 KIND_CLUSTER_NAME ?= ${PROJECT_NAME}-$(KINDTEST_K8S_VERSION)
+KIND_CONFIG ?= test/e2e/kind-config.yaml
 
 .PHONY: kind
 KIND = $(LOCALBIN)/kind
@@ -356,7 +357,7 @@ OLM_VERSION ?= v0.28.0
 # Create a kind cluster, install ingress-nginx, and wait for it to be available.
 .PHONY: kind-create
 kind-create: kind ## Create a kind cluster.
-	$(KIND) create cluster --config test/e2e/kind-config.yaml --image $(KIND_IMAGE) --name $(KIND_CLUSTER_NAME) --kubeconfig $(KIND_KUBECONFIG) --wait 120s
+	$(KIND) create cluster --config $(KIND_CONFIG) --image $(KIND_IMAGE) --name $(KIND_CLUSTER_NAME) --kubeconfig $(KIND_KUBECONFIG) --wait 120s
 	KUBECONFIG=$(KIND_KUBECONFIG) make kind-setup
 
 .PHONY: kind-setup

@@ -9,6 +9,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const RoleHiveMetaStore = "hivemetastore"
+
 type ClusterReconciler struct {
 	client client.Client
 	scheme *runtime.Scheme

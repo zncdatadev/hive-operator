@@ -373,6 +373,9 @@ func (r *HiveSiteSecret) hiveSiteProperties() (map[string]string, error) {
 		properties["fs.s3a.impl"] = "org.apache.hadoop.fs.s3a.S3AFileSystem"
 		properties["fs.AbstractFileSystem.s3a.impl"] = "org.apache.hadoop.fs.s3a.S3A"
 	}
+	if IsKerberosEnabled(r.cr.Spec.ClusterConfig) {
+		KrbHiveSiteXml(properties, r.cr.Name, r.cr.Namespace)
+	}
 
 	return properties, nil
 }
