@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"maps"
 	"strings"
 	"time"
@@ -101,6 +102,10 @@ func (r *DeploymentReconciler) hiveSiteMountName() string {
 	return "hive-site"
 }
 
+func (r *DeploymentReconciler) coreSiteMountName() string {
+	return "core-site"
+}
+
 func (r *DeploymentReconciler) log4jMountName() string {
 	return "hive-log4j2"
 }
@@ -143,15 +148,34 @@ func (r *DeploymentReconciler) hiveDataMountName() string {
 func (r *DeploymentReconciler) createVolumes() []corev1.Volume {
 	vs := []corev1.Volume{
 		{
+			Name: hivev1alpha1.ZncDataConfigDirName,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: func() *resource.Quantity { q := resource.MustParse("10Mi"); return &q }(),
+				},
+			},
+		},
+		{
 			Name: r.hiveSiteMountName(),
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: HiveSiteSecretName(r.cr, r.roleGroupName),
+					DefaultMode: func() *int32 { i := int32(0755); return &i }(),
+					SecretName:  HiveSiteSecretName(r.cr, r.roleGroupName),
 					Items: []corev1.KeyToPath{
 						{
 							Key:  HiveSiteName,
 							Path: HiveSiteName,
 						},
+					},
+				},
+			},
+		},
+		{
+			Name: r.coreSiteMountName(),
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: HiveMetaStoreConfigMapName(r.cr, r.roleGroupName),
 					},
 				},
 			},
@@ -188,7 +212,31 @@ func (r *DeploymentReconciler) createVolumes() []corev1.Volume {
 		})
 	}
 
+	if IsKerberosEnabled(r.cr.Spec.ClusterConfig) {
+		secretClass := r.cr.Spec.ClusterConfig.Authentication.Kerberos.SecretClass
+		vs = append(vs, KrbVolume(secretClass, r.cr.Name))
+	}
+
 	return vs
+}
+
+func (r *DeploymentReconciler) command() []string {
+	return []string{"/bin/bash", "-x", "-euo", "pipefail", "-c"}
+}
+
+func (r *DeploymentReconciler) args() []string {
+	tmplate :=
+		`mkdir /zncdata/config
+cp /zncdata/mount/config/*.xml /zncdata/config/
+{{ if .kerberosEnabled }}
+{{- .kerberosScript -}}
+{{- end }}
+
+export HIVE_CUSTOM_CONF_DIR="/zncdata/config"
+exec sh -c "/entrypoint.sh"
+`
+	data := CreateKrbScriptData(r.cr.Spec.ClusterConfig)
+	return ParseKerberosScript(tmplate, data)
 }
 
 func (r *DeploymentReconciler) replicas() int32 {
@@ -295,8 +343,13 @@ func (r *DeploymentReconciler) volumeMounts() []corev1.VolumeMount {
 	vms := []corev1.VolumeMount{
 		{
 			Name:      r.hiveSiteMountName(),
-			MountPath: "/opt/hive/conf/hive-site.xml",
+			MountPath: hivev1alpha1.ZncDataConfigMountDir + "/hive-site.xml",
 			SubPath:   "hive-site.xml",
+		},
+		{
+			Name:      r.coreSiteMountName(),
+			MountPath: hivev1alpha1.ZncDataConfigMountDir + "/core-site.xml",
+			SubPath:   "core-site.xml",
 		},
 	}
 
@@ -313,6 +366,10 @@ func (r *DeploymentReconciler) volumeMounts() []corev1.VolumeMount {
 			MountPath: "/opt/hive/conf/" + HiveMetastoreLog4jName,
 			SubPath:   HiveMetastoreLog4jName,
 		})
+	}
+
+	if IsKerberosEnabled(r.cr.Spec.ClusterConfig) {
+		vms = append(vms, KrbVolumeMount())
 	}
 	return vms
 }
@@ -363,6 +420,8 @@ func (r *DeploymentReconciler) createContainer() corev1.Container {
 				Value: "metastore",
 			},
 		},
+		Command: r.command(),
+		Args:    r.args(),
 		Ports: []corev1.ContainerPort{
 			{
 				ContainerPort: 9083,
@@ -376,6 +435,10 @@ func (r *DeploymentReconciler) createContainer() corev1.Container {
 	obj.EnvFrom = r.containerFromEnvSecret()
 
 	obj.Env = append(obj.Env, r.overrideEnv()...)
+
+	if IsKerberosEnabled(r.cr.Spec.ClusterConfig) {
+		obj.Env = append(obj.Env, KrbEnv()...)
+	}
 
 	return obj
 }

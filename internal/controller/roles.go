@@ -149,8 +149,14 @@ func (r *MetastoreRole) reconcileRoleGroup(
 		return result, nil
 	}
 
-	dataPVC := NewPVCReconciler(r.client, r.scheme, r.cr, name, roleGroup)
+	configmap := NewConfigMapRecociler(r.client, r.scheme, r.cr, name)
+	if result, err := configmap.Reconcile(ctx); err != nil {
+		return ctrl.Result{}, err
+	} else if result.RequeueAfter > 0 {
+		return result, nil
+	}
 
+	dataPVC := NewPVCReconciler(r.client, r.scheme, r.cr, name, roleGroup)
 	if result, err := dataPVC.Reconcile(ctx); err != nil {
 		return ctrl.Result{}, err
 	} else if result.RequeueAfter > 0 {

@@ -22,10 +22,18 @@ import (
 )
 
 const (
-	WarehouseDir    = "/opt/hive/data"
-	ImageRepository = "docker.io/apache/hive"
-	ImageTag        = "4.0.0-beta-1"
-	ImagePullPolicy = corev1.PullAlways
+	ZncDataConfigDirName = "zncdata-config"
+)
+
+const (
+	WarehouseDir          = "/opt/hive/data"
+	ImageRepository       = "quay.io/zncdatadev/hive"
+	ImageTag              = "4.0.0"
+	ImagePullPolicy       = corev1.PullAlways
+	KerberosMountPath     = "/zncdata/kerberos"
+	TlsMountPath          = "/zncdata/tls"
+	ZncDataConfigDir      = "/zncdata/config"
+	ZncDataConfigMountDir = "/zncdata/mount/config"
 )
 
 // +kubebuilder:object:root=true
@@ -51,11 +59,11 @@ type HiveMetastoreList struct {
 
 type ImageSpec struct {
 	// +kubebuilder:validation=Optional
-	// +kubebuilder:default=docker.io/apache/hive
+	// +kubebuilder:default=quay.io/zncdatadev/hive
 	Repository string `json:"repository,omitempty"`
 
 	// +kubebuilder:validation=Optional
-	// +kubebuilder:default="4.0.0-beta-1"
+	// +kubebuilder:default="4.0.0"
 	Tag string `json:"tag,omitempty"`
 
 	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
@@ -87,6 +95,32 @@ type ClusterConfigSpec struct {
 
 	// +kubebuilder:validation:Optional
 	Listener *ListenerSpec `json:"listener,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Authentication *AuthenticationSpec `json:"authentication,omitempty"`
+}
+
+type AuthenticationSpec struct {
+	// +kubebuilder:validation:Optional
+	Tls *TlsSpec `json:"tls,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Kerberos *KerberosSpec `json:"kerberos,omitempty"`
+}
+
+type TlsSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="tls"
+	SecretClass string `json:"secretClass,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="changeit"
+	JksPassword string `json:"jksPassword,omitempty"`
+}
+
+type KerberosSpec struct {
+	// +kubebuilder:validation:Optional
+	SecretClass string `json:"secretClass,omitempty"`
 }
 
 type ClusterOperationSpec struct {

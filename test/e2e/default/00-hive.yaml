@@ -9,6 +9,9 @@ metadata:
     app.kubernetes.io/created-by: hive-operator
   name: hivemetastore-sample
 spec:
+  image:
+    repository: quay.io/zncdatadev-test/hive
+    tag: 4.0.0
   metastore:
     roleGroups:
       default:
