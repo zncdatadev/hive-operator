@@ -2,9 +2,6 @@ package controller
 
 import (
 	"context"
-	"strconv"
-	"time"
-
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,17 +71,6 @@ func (r *EnvSecret) Reconcile(ctx context.Context) (ctrl.Result, error) {
 
 func (r *EnvSecret) apply(ctx context.Context) (ctrl.Result, error) {
 	var data = make(map[string]string)
-	if r.s3.Enabled() {
-		s3Data, err := r.s3SecretData()
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		for k, v := range s3Data {
-			data[k] = v
-		}
-	}
-
 	if r.db.Enabled() {
 		dbData, err := r.databaseSecretData()
 		if err != nil {
@@ -96,10 +82,10 @@ func (r *EnvSecret) apply(ctx context.Context) (ctrl.Result, error) {
 		}
 	}
 
-	if len(data) == 0 {
-		log.Info("Database config not found, use derby by default.")
-		return ctrl.Result{Requeue: false}, nil
-	}
+	//if len(data) == 0 {
+	//	log.Info("Database config not found, use derby by default.")
+	//	return ctrl.Result{Requeue: false}, nil
+	//}
 
 	obj, err := r.make(data)
 	if err != nil {
@@ -114,32 +100,6 @@ func (r *EnvSecret) apply(ctx context.Context) (ctrl.Result, error) {
 		return ctrl.Result{Requeue: true}, nil
 	}
 	return ctrl.Result{Requeue: false}, nil
-}
-
-func (r *EnvSecret) s3SecretData() (map[string]string, error) {
-	if r.s3.ExistingS3Bucket() {
-		params, err := r.s3.GetS3ParamsFromResource()
-		if err != nil {
-			return nil, err
-		}
-		return map[string]string{
-			"AWS_ACCESS_KEY":     params.AccessKey,
-			"AWS_SECRET_KEY":     params.SecretKey,
-			"AWS_DEFAULT_REGION": params.Region,
-		}, nil
-	}
-
-	params, err := r.s3.GetS3ParamsFromInline()
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]string{
-		"AWS_ACCESS_KEY":     params.AccessKey,
-		"AWS_SECRET_KEY":     params.SecretKey,
-		"AWS_DEFAULT_REGION": params.Region,
-	}, nil
-
 }
 
 // databaseValuesFromCR Get database values from the CR.
@@ -226,180 +186,4 @@ func serviceOptsBuilder(driver string, username string, password string, host st
 		" -Djavax.jdo.option.ConnectionURL=" + jdbcURL +
 		" -Djavax.jdo.option.ConnectionUserName=" + username +
 		" -Djavax.jdo.option.ConnectionPassword=" + password
-}
-
-const HiveSiteName = "hive-site.xml"
-
-type HiveSiteSecret struct {
-	client client.Client
-	scheme *runtime.Scheme
-
-	roleGroupName string
-	roleGroup     *hivev1alpha1.RoleGroupSpec
-
-	cr *hivev1alpha1.HiveMetastore
-	s3 *S3Configuration
-	db *DatabaseConfiguration
-}
-
-func NewHiveSiteSecret(
-	ctx context.Context,
-	client client.Client,
-	scheme *runtime.Scheme,
-	cr *hivev1alpha1.HiveMetastore,
-	roleGroupName string,
-	roleGroup *hivev1alpha1.RoleGroupSpec,
-) *HiveSiteSecret {
-
-	resourceClient := ResourceClient{
-		Ctx:       ctx,
-		Client:    client,
-		Namespace: cr.Namespace,
-		Log:       log,
-	}
-
-	s3 := NewS3Configuration(cr, resourceClient)
-
-	db := NewDatabaseConfiguration(cr, resourceClient)
-
-	return &HiveSiteSecret{
-		client:        client,
-		scheme:        scheme,
-		cr:            cr,
-		roleGroupName: roleGroupName,
-		roleGroup:     roleGroup,
-		s3:            s3,
-		db:            db,
-	}
-}
-
-func HiveSiteSecretName(cr *hivev1alpha1.HiveMetastore, roleGroupName string) string {
-	return cr.GetNameWithSuffix(roleGroupName + "-hive-site")
-}
-
-func (r *HiveSiteSecret) Labels() map[string]string {
-	return map[string]string{
-		"app": r.cr.GetName(),
-	}
-}
-
-func (r *HiveSiteSecret) NameSpace() string {
-	return r.cr.Namespace
-}
-
-func (r *HiveSiteSecret) Reconcile(ctx context.Context) (ctrl.Result, error) {
-	return r.apply(ctx)
-}
-
-func (r *HiveSiteSecret) apply(ctx context.Context) (ctrl.Result, error) {
-
-	properties, err := r.hiveSiteProperties()
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	properties, err = r.overridesHiveSiteProperties(properties)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	value := hiveSiteXML(properties)
-
-	data := map[string][]byte{
-		HiveSiteName: []byte(value),
-	}
-
-	obj, err := r.make(data)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if effected, err := CreateOrUpdate(ctx, r.client, &obj); err != nil {
-		return ctrl.Result{}, err
-	} else if effected {
-		return ctrl.Result{RequeueAfter: time.Second}, nil
-	}
-	return ctrl.Result{}, nil
-}
-
-func (r *HiveSiteSecret) make(data map[string][]byte) (corev1.Secret, error) {
-	obj := corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      HiveSiteSecretName(r.cr, r.roleGroupName),
-			Namespace: r.NameSpace(),
-			Labels:    r.Labels(),
-		},
-		Data: data,
-	}
-
-	if err := ctrl.SetControllerReference(r.cr, &obj, r.scheme); err != nil {
-		return obj, err
-	}
-
-	return obj, nil
-}
-
-func (r *HiveSiteSecret) warehouseDir() string {
-	if r.roleGroup.Config != nil && r.roleGroup.Config.WarehouseDir != "" {
-		return r.roleGroup.Config.WarehouseDir
-	}
-	return hivev1alpha1.WarehouseDir
-}
-
-func (r *HiveSiteSecret) hiveSiteProperties() (map[string]string, error) {
-	properties := map[string]string{
-		"hive.metastore.warehouse.dir": r.warehouseDir(),
-	}
-	if r.s3.Enabled() {
-		var params *S3Params
-
-		if r.s3.ExistingS3Bucket() {
-			var err error
-			params, err = r.s3.GetS3ParamsFromResource()
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			var err error
-			params, err = r.s3.GetS3ParamsFromInline()
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		properties["hive.metastore.s3.path"] = params.Bucket
-		properties["fs.s3a.connection.ssl.enabled"] = strconv.FormatBool(params.SSL)
-		properties["fs.s3a.path.style.access"] = strconv.FormatBool(params.PathStyle)
-		properties["fs.s3a.impl"] = "org.apache.hadoop.fs.s3a.S3AFileSystem"
-		properties["fs.AbstractFileSystem.s3a.impl"] = "org.apache.hadoop.fs.s3a.S3A"
-	}
-	if IsKerberosEnabled(r.cr.Spec.ClusterConfig) {
-		KrbHiveSiteXml(properties, r.cr.Name, r.cr.Namespace)
-	}
-
-	return properties, nil
-}
-
-func (r *HiveSiteSecret) overridesHiveSiteProperties(properties map[string]string) (map[string]string, error) {
-	if r.roleGroup.ConfigOverrides != nil && r.roleGroup.ConfigOverrides.HiveSite != nil {
-		for k, v := range r.roleGroup.ConfigOverrides.HiveSite {
-			properties[k] = v
-		}
-	}
-	return properties, nil
-}
-
-func hiveSiteXML(properties map[string]string) string {
-	xml := "" +
-		"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
-		"<?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>\n" +
-		"<configuration>\n"
-	for k, v := range properties {
-		xml += "  <property>\n"
-		xml += "    <name>" + k + "</name>\n"
-		xml += "    <value>" + v + "</value>\n"
-		xml += "  </property>\n"
-	}
-	xml += "</configuration>\n"
-	return xml
 }

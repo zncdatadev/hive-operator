@@ -4,11 +4,8 @@ import (
 	"fmt"
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
 	"github.com/zncdatadev/operator-go/pkg/config"
-	"github.com/zncdatadev/operator-go/pkg/util"
 	"github.com/zncdatadev/secret-operator/pkg/volume"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const KrbVolumeName = "kerberos"
@@ -31,35 +28,11 @@ func PrincipalHostPart(instanceName string, ns string) string {
 }
 
 func KrbVolume(secretClass string, instanceName string) corev1.Volume {
-	return corev1.Volume{
-		Name: KrbVolumeName,
-		VolumeSource: corev1.VolumeSource{
-			Ephemeral: &corev1.EphemeralVolumeSource{
-				VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							volume.SecretsZncdataClass:                secretClass,
-							volume.SecretsZncdataScope:                fmt.Sprintf("service=%s", instanceName),
-							volume.SecretsZncdataKerberosServiceNames: HiveKerberosServiceName + ",HTTP",
-						},
-					},
-					Spec: corev1.PersistentVolumeClaimSpec{
-						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						StorageClassName: func() *string {
-							cs := "secrets.zncdata.dev"
-							return &cs
-						}(),
-						VolumeMode: func() *corev1.PersistentVolumeMode { v := corev1.PersistentVolumeFilesystem; return &v }(),
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("1Gi"),
-							},
-						},
-					},
-				},
-			},
-		},
-	}
+	return SecretVolume(map[string]string{
+		volume.SecretsZncdataClass:                secretClass,
+		volume.SecretsZncdataScope:                fmt.Sprintf("service=%s", instanceName),
+		volume.SecretsZncdataKerberosServiceNames: HiveKerberosServiceName + ",HTTP",
+	}, KrbVolumeName)
 }
 
 func KrbVolumeMount() corev1.VolumeMount {
@@ -69,31 +42,37 @@ func KrbVolumeMount() corev1.VolumeMount {
 	}
 }
 
-func KrbEnv() []corev1.EnvVar {
-	return []corev1.EnvVar{
-		{
-			Name:  "KRB5_CONFIG",
-			Value: fmt.Sprintf("%s/krb5.conf", hivev1alpha1.KerberosMountPath),
-		},
-		{
-			//official docker images jvm args for kerberos
-			//https://hub.docker.com/r/apache/hive
-			//https://github.com/apache/hive/blob/master/packaging/src/docker/entrypoint.sh
-			//https://github.com/apache/hive/blob/master/packaging/src/docker/README.md
-			Name:  "SERVICE_OPTS",
-			Value: fmt.Sprintf("-Djava.security.krb5.conf=%s/krb5.conf", hivev1alpha1.KerberosMountPath),
-		},
+func KrbEnv(envs []corev1.EnvVar) []corev1.EnvVar {
+	envs = append(envs, corev1.EnvVar{
+		Name:  "KRB5_CONFIG",
+		Value: fmt.Sprintf("%s/krb5.conf", hivev1alpha1.KerberosMountPath),
+	})
+
+	jvmKrbConfigArgs := fmt.Sprintf("-Djava.security.krb5.conf=%s/krb5.conf -Dhive.root.logger=console", hivev1alpha1.KerberosMountPath)
+	serviceOptsExists := false
+	// Check if envs contains the Name=SERVICE_OPTS item
+	for i, env := range envs {
+		if env.Name == "SERVICE_OPTS" {
+			serviceOptsExists = true
+			// Append the specified value to the existing SERVICE_OPTS item
+			envs[i].Value += " " + jvmKrbConfigArgs
+			break
+		}
 	}
+	// If SERVICE_OPTS item doesn't exist, add it with the specified value
+	if !serviceOptsExists {
+		envs = append(envs, corev1.EnvVar{
+			Name:  "SERVICE_OPTS",
+			Value: jvmKrbConfigArgs,
+		})
+	}
+	return envs
 }
 
 // KrbCoreSiteXml if kerberos is activated but we have no HDFS as backend (i.e. S3) then a core-site.xml is
 // needed to set "hadoop.security.authentication"
-func KrbCoreSiteXml() map[string]string {
-	xml := util.XmlConfiguration{Properties: []util.XmlNameValuePair{{Name: "hadoop.security.authentication", Value: "kerberos"}}}
-	content := xml.String(nil)
-	return map[string]string{
-		"core-site.xml": content,
-	}
+func KrbCoreSiteXml(coreSiteProperties map[string]string) {
+	coreSiteProperties["hadoop.security.authentication"] = "kerberos"
 }
 
 func ParseKerberosScript(tmpl string, data map[string]interface{}) []string {

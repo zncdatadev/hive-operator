@@ -142,6 +142,8 @@ spec:
                       reference:
                         description: S3 bucket name with S3Bucket
                         type: string
+                      secretClass:
+                        type: string
                     required:
                     - maxConnect
                     - pathStyle_access
@@ -1505,6 +1507,10 @@ spec:
                     type: object
                   configOverrides:
                     properties:
+                      core-site.xml:
+                        additionalProperties:
+                          type: string
+                        type: object
                       hive-site.xml:
                         additionalProperties:
                           type: string
@@ -10894,6 +10900,10 @@ spec:
                           type: object
                         configOverrides:
                           properties:
+                            core-site.xml:
+                              additionalProperties:
+                                type: string
+                              type: object
                             hive-site.xml:
                               additionalProperties:
                                 type: string

@@ -158,13 +158,15 @@ func (r *DeploymentReconciler) createVolumes() []corev1.Volume {
 		{
 			Name: r.hiveSiteMountName(),
 			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
 					DefaultMode: func() *int32 { i := int32(0755); return &i }(),
-					SecretName:  HiveSiteSecretName(r.cr, r.roleGroupName),
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: HiveMetaStoreConfigMapName(r.cr, r.roleGroupName),
+					},
 					Items: []corev1.KeyToPath{
 						{
-							Key:  HiveSiteName,
-							Path: HiveSiteName,
+							Key:  "hive-site.xml",
+							Path: "hive-site.xml",
 						},
 					},
 				},
@@ -217,6 +219,10 @@ func (r *DeploymentReconciler) createVolumes() []corev1.Volume {
 		vs = append(vs, KrbVolume(secretClass, r.cr.Name))
 	}
 
+	if IsS3Enable(r.cr.Spec.ClusterConfig) {
+		secretClass := r.cr.Spec.ClusterConfig.S3Bucket.SecretClass
+		vs = append(vs, S3Volume(secretClass))
+	}
 	return vs
 }
 
@@ -232,10 +238,24 @@ cp /zncdata/mount/config/*.xml /zncdata/config/
 {{- .kerberosScript -}}
 {{- end }}
 
+set +x
+{{ if .s3Enabled }}
+{{- .s3Script -}}
+{{- end }}
+set -x
+
 export HIVE_CUSTOM_CONF_DIR="/zncdata/config"
 exec sh -c "/entrypoint.sh"
 `
-	data := CreateKrbScriptData(r.cr.Spec.ClusterConfig)
+	var data = make(map[string]interface{})
+	krbTemplateData := CreateKrbScriptData(r.cr.Spec.ClusterConfig)
+	s3TemplateData := CreateS3ScriptData(r.cr.Spec.ClusterConfig)
+	if len(krbTemplateData) > 0 {
+		maps.Copy(data, krbTemplateData)
+	}
+	if len(s3TemplateData) > 0 {
+		maps.Copy(data, s3TemplateData)
+	}
 	return ParseKerberosScript(tmplate, data)
 }
 
@@ -371,6 +391,10 @@ func (r *DeploymentReconciler) volumeMounts() []corev1.VolumeMount {
 	if IsKerberosEnabled(r.cr.Spec.ClusterConfig) {
 		vms = append(vms, KrbVolumeMount())
 	}
+
+	if IsS3Enable(r.cr.Spec.ClusterConfig) {
+		vms = append(vms, S3VolumeMount())
+	}
 	return vms
 }
 
@@ -437,7 +461,7 @@ func (r *DeploymentReconciler) createContainer() corev1.Container {
 	obj.Env = append(obj.Env, r.overrideEnv()...)
 
 	if IsKerberosEnabled(r.cr.Spec.ClusterConfig) {
-		obj.Env = append(obj.Env, KrbEnv()...)
+		obj.Env = KrbEnv(obj.Env)
 	}
 
 	return obj
