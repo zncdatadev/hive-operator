@@ -4,7 +4,7 @@ import (
 	"strconv"
 
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
-	commonsv1alph1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
+	databasev1alph1 "github.com/zncdatadev/operator-go/pkg/apis/database/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -52,21 +52,21 @@ func (d *DatabaseConfiguration) ExistingDatabase() bool {
 	return d.cr.Spec.ClusterConfig.Database.Reference != ""
 }
 
-func (d *DatabaseConfiguration) GetRefDatabase() (commonsv1alph1.Database, error) {
-	databaseCR := &commonsv1alph1.Database{
+func (d *DatabaseConfiguration) GetRefDatabase() (databasev1alph1.Database, error) {
+	databaseCR := &databasev1alph1.Database{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: d.ResourceClient.Namespace,
 			Name:      d.GetRefDatabaseName(),
 		},
 	}
 	if err := d.ResourceClient.Get(databaseCR); err != nil {
-		return commonsv1alph1.Database{}, err
+		return databasev1alph1.Database{}, err
 	}
 	return *databaseCR, nil
 }
 
-func (d *DatabaseConfiguration) GetRefDatabaseConnection(name string) (commonsv1alph1.DatabaseConnection, error) {
-	databaseConnectionCR := &commonsv1alph1.DatabaseConnection{
+func (d *DatabaseConfiguration) GetRefDatabaseConnection(name string) (databasev1alph1.DatabaseConnection, error) {
+	databaseConnectionCR := &databasev1alph1.DatabaseConnection{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: d.ResourceClient.Namespace,
 			Name:      name,
@@ -74,7 +74,7 @@ func (d *DatabaseConfiguration) GetRefDatabaseConnection(name string) (commonsv1
 	}
 
 	if err := d.ResourceClient.Get(databaseConnectionCR); err != nil {
-		return commonsv1alph1.DatabaseConnection{}, err
+		return databasev1alph1.DatabaseConnection{}, err
 	}
 	return *databaseConnectionCR, nil
 }
