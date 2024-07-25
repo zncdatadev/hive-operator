@@ -17,23 +17,23 @@ type ServiceReconciler struct {
 	client client.Client
 	scheme *runtime.Scheme
 
+	labels        map[string]string
 	cr            *hivev1alpha1.HiveMetastore
-	roleGroup     *hivev1alpha1.RoleGroupSpec
 	roleGroupName string
 }
 
 func NewReconcileService(
 	client client.Client,
 	schema *runtime.Scheme,
+	labels map[string]string,
 	cr *hivev1alpha1.HiveMetastore,
-	roleGroup *hivev1alpha1.RoleGroupSpec,
 	roleGroupName string,
 ) *ServiceReconciler {
 	return &ServiceReconciler{
 		client:        client,
 		scheme:        schema,
+		labels:        labels,
 		cr:            cr,
-		roleGroup:     roleGroup,
 		roleGroupName: roleGroupName,
 	}
 }
@@ -43,9 +43,7 @@ func (r *ServiceReconciler) Name() string {
 }
 
 func (r *ServiceReconciler) Labels() map[string]string {
-	return map[string]string{
-		"app": r.Name(),
-	}
+	return r.labels
 }
 
 func (r *ServiceReconciler) NameSpace() string {

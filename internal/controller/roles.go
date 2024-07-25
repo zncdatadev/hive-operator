@@ -142,14 +142,7 @@ func (r *MetastoreRole) reconcileRoleGroup(
 		}
 	}
 
-	secret := NewHiveSiteSecret(ctx, r.client, r.scheme, r.cr, name, roleGroup)
-	if result, err := secret.Reconcile(ctx); err != nil {
-		return ctrl.Result{}, err
-	} else if result.RequeueAfter > 0 {
-		return result, nil
-	}
-
-	configmap := NewConfigMapRecociler(r.client, r.scheme, r.cr, name)
+	configmap := NewConfigMapRecociler(ctx, r.client, r.scheme, roleGroup, r.cr, name)
 	if result, err := configmap.Reconcile(ctx); err != nil {
 		return ctrl.Result{}, err
 	} else if result.RequeueAfter > 0 {
@@ -163,7 +156,7 @@ func (r *MetastoreRole) reconcileRoleGroup(
 		return result, nil
 	}
 
-	if result, err := NewReconcileService(r.client, r.scheme, r.cr, roleGroup, name).Reconcile(ctx); err != nil {
+	if result, err := NewReconcileService(r.client, r.scheme, r.GetLabels(), r.cr, name).Reconcile(ctx); err != nil {
 		return ctrl.Result{}, err
 	} else if result.RequeueAfter > 0 {
 		return result, nil

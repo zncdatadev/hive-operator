@@ -31,6 +31,7 @@ const (
 	ImageTag              = "4.0.0"
 	ImagePullPolicy       = corev1.PullAlways
 	KerberosMountPath     = "/zncdata/kerberos"
+	S3SecretDir           = "/zncdata/secrets"
 	TlsMountPath          = "/zncdata/tls"
 	ZncDataConfigDir      = "/zncdata/config"
 	ZncDataConfigMountDir = "/zncdata/mount/config"
@@ -169,6 +170,7 @@ type RoleSpec struct {
 
 type ConfigOverridesSpec struct {
 	HiveSite map[string]string `json:"hive-site.xml,omitempty"`
+	CoreSite map[string]string `json:"core-site.xml,omitempty"`
 }
 
 type ConfigSpec struct {
@@ -268,6 +270,9 @@ type S3BucketSpec struct {
 	// S3 bucket name with S3Bucket
 	// +kubebuilder:validation=Optional
 	Reference *string `json:"reference"`
+
+	// +kubebuilder:validation=Optional
+	SecretClass *string `json:"secretClass,omitempty"`
 
 	// +kubebuilder:validation=Optional
 	Inline *S3BucketInlineSpec `json:"inline,omitempty"`

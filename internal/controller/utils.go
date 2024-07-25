@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -140,4 +141,31 @@ func contains(slice []string, str string) bool {
 		}
 	}
 	return false
+}
+func SecretVolume(annotations map[string]string, volumeName string) corev1.Volume {
+	return corev1.Volume{
+		Name: volumeName,
+		VolumeSource: corev1.VolumeSource{
+			Ephemeral: &corev1.EphemeralVolumeSource{
+				VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: annotations,
+					},
+					Spec: corev1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						StorageClassName: func() *string {
+							cs := "secrets.zncdata.dev"
+							return &cs
+						}(),
+						VolumeMode: func() *corev1.PersistentVolumeMode { v := corev1.PersistentVolumeFilesystem; return &v }(),
+						Resources: corev1.VolumeResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("10Mi"),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }
