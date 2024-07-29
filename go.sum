@@ -111,8 +111,8 @@ github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
-github.com/zncdatadev/operator-go v0.8.3 h1:OwjvVf9PR+s1BEWW2tCKUuHOV0iVnsr1ReGVbdDNaKo=
-github.com/zncdatadev/operator-go v0.8.3/go.mod h1:wwISwqkAhgyeaJ6OSBji2PB1a3Jsz0Yu0uTabmWxUpM=
+github.com/zncdatadev/operator-go v0.8.5 h1:KP0CKTkODBVwL4/mFErY3oK7lqYwW9nGrejKtfiBNRo=
+github.com/zncdatadev/operator-go v0.8.5/go.mod h1:wwISwqkAhgyeaJ6OSBji2PB1a3Jsz0Yu0uTabmWxUpM=
 github.com/zncdatadev/secret-operator v0.0.0-20240702125144-ea71dfd42d9f h1:2B0yoV5hC8YOr07j6sKy5SUe/eTmj8On4Q1lt7dtO1o=
 github.com/zncdatadev/secret-operator v0.0.0-20240702125144-ea71dfd42d9f/go.mod h1:U9VDQ1Emgoe2+1vmveEeL86FFgBOtKiKA3GDcYvnLqI=
 go.uber.org/atomic v1.7.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
