@@ -2,10 +2,11 @@ package controller
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"maps"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -98,18 +99,6 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context) (ctrl.Result, erro
 	return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 }
 
-func (r *DeploymentReconciler) hiveSiteMountName() string {
-	return "hive-site"
-}
-
-func (r *DeploymentReconciler) coreSiteMountName() string {
-	return "core-site"
-}
-
-func (r *DeploymentReconciler) log4jMountName() string {
-	return "hive-log4j2"
-}
-
 func (r *DeploymentReconciler) getPodTemplate() corev1.PodTemplateSpec {
 	copyedPodTemplate := r.roleGroup.PodOverride.DeepCopy()
 	podTemplate := corev1.PodTemplateSpec{}
@@ -140,15 +129,16 @@ func (r *DeploymentReconciler) metastoreConfigMapName() string {
 	return MetastoreLog4jConfigMapName(r.cr, r.roleGroupName)
 }
 
-func (r *DeploymentReconciler) hiveDataMountName() string {
-	return "warehouse"
-}
+// func (r *DeploymentReconciler) hiveDataMountName() string {
+// 	return "warehouse"
+// }
 
 // volumes returns the volumes for the deployment
 func (r *DeploymentReconciler) createVolumes() []corev1.Volume {
 	vs := []corev1.Volume{
 		{
-			Name: hivev1alpha1.ZncDataConfigDirName,
+			// config dir, writeable
+			Name: hivev1alpha1.KubeDataConfigDirName,
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
 					SizeLimit: func() *resource.Quantity { q := resource.MustParse("10Mi"); return &q }(),
@@ -156,69 +146,55 @@ func (r *DeploymentReconciler) createVolumes() []corev1.Volume {
 			},
 		},
 		{
-			Name: r.hiveSiteMountName(),
+			// log dir
+			Name: hivev1alpha1.KubeDataLogDirName,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: func() *resource.Quantity { q := resource.MustParse("30Mi"); return &q }(),
+				},
+			},
+		},
+		{
+			// config mount dir, read only
+			Name: hivev1alpha1.KubeDataConfigMountDirName,
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					DefaultMode: func() *int32 { i := int32(0755); return &i }(),
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: HiveMetaStoreConfigMapName(r.cr, r.roleGroupName),
 					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  "hive-site.xml",
-							Path: "hive-site.xml",
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: r.coreSiteMountName(),
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: HiveMetaStoreConfigMapName(r.cr, r.roleGroupName),
-					},
 				},
 			},
 		},
 	}
 
-	if r.EnabledDataPVC() {
-		vs = append(vs, corev1.Volume{
-			Name: r.hiveDataMountName(),
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: HiveDataPVCName(r.cr, r.roleGroupName),
+	// if r.EnabledDataPVC() {
+	// 	vs = append(vs, corev1.Volume{
+	// 		Name: r.hiveDataMountName(),
+	// 		VolumeSource: corev1.VolumeSource{
+	// 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+	// 				ClaimName: HiveDataPVCName(r.cr, r.roleGroupName),
+	// 			},
+	// 		},
+	// 	})
+	// }
+	// log4j2 config dir, read only
+	vs = append(vs, corev1.Volume{
+		Name: hivev1alpha1.KubeDataLogConfigMountDirName,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: r.metastoreConfigMapName(),
 				},
 			},
-		})
-	}
-
-	if r.EnabledLogging() {
-		vs = append(vs, corev1.Volume{
-			Name: r.log4jMountName(),
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: r.metastoreConfigMapName(),
-					},
-					Items: []corev1.KeyToPath{
-						{
-							Key:  HiveMetastoreLog4jName,
-							Path: HiveMetastoreLog4jName,
-						},
-					},
-				},
-			},
-		})
-	}
-
+		},
+	})
+	//kerberos
 	if IsKerberosEnabled(r.cr.Spec.ClusterConfig) {
 		secretClass := r.cr.Spec.ClusterConfig.Authentication.Kerberos.SecretClass
 		vs = append(vs, KrbVolume(secretClass, r.cr.Name))
 	}
-
+	// secret
 	if IsS3Enable(r.cr.Spec.ClusterConfig) {
 		secretClass := r.cr.Spec.ClusterConfig.S3Bucket.SecretClass
 		vs = append(vs, S3Volume(secretClass))
@@ -230,25 +206,48 @@ func (r *DeploymentReconciler) command() []string {
 	return []string{"/bin/bash", "-x", "-euo", "pipefail", "-c"}
 }
 
-func (r *DeploymentReconciler) args() []string {
-	tmplate :=
-		`mkdir /zncdata/config
-cp /zncdata/mount/config/*.xml /zncdata/config/
-{{ if .kerberosEnabled }}
+func (r *DeploymentReconciler) Args() []string {
+	var args []string
+	// copy hive config from mount to writeable folder
+	args = append(args, `echo copying {{.ConfigMountDir}} to {{.ConfigDir}}
+cp -RL {{.ConfigMountDir}}/*.xml {{.ConfigDir}}/
+	`)
+
+	// copy hive log4j config from mount to writeable folder
+	args = append(args, `echo copying {{.LogMountDir}}/{{.HiveLog4j2Properties}} to {{.ConfigDir}}/{{.HiveLog4j2Properties}}
+cp -RL {{.LogMountDir}}/* {{.ConfigDir}}/
+	`)
+	// kerberos
+	args = append(args, `{{ if .kerberosEnabled }}
 {{- .kerberosScript -}}
 {{- end }}
-
-set +x
-{{ if .s3Enabled }}
+	`)
+	// s3
+	args = append(args, `{{ if .s3Enabled }}
 {{- .s3Script -}}
-{{- end }}
-set -x
+{{- end }}`)
+	//common bash trap functions
+	args = append(args, COMMON_BASH_TRAP_FUNCTIONS)
+	//remove vector shutdown file command
+	args = append(args, RemoveVectorShutdownFileCommand("{{.LogDir}}"))
+	//hive executer
+	args = append(args, `prepare_signal_handlers
+DB_TYPE="${DB_DRIVER:-derby}"
+echo "hive db type is $DB_TYPE"
+bin/start-metastore --config {{.ConfigDir}} --db-type $DB_TYPE --hive-bin-dir bin &
+wait_for_termination $!
+	`)
+	//create vector shutdown file command
+	args = append(args, CreateVectorShutdownFileCommand("{{.LogDir}}"))
+	tmplate := strings.Join(args, "\n")
 
-export HIVE_CUSTOM_CONF_DIR="/zncdata/config"
-exec sh -c "/entrypoint.sh"
-`
 	var data = make(map[string]interface{})
 	krbTemplateData := CreateKrbScriptData(r.cr.Spec.ClusterConfig)
+	data["ConfigDir"] = hivev1alpha1.KubeDataConfigDir
+	data["ConfigMountDir"] = hivev1alpha1.KubeDataConfigMountDir
+	data["LogDir"] = hivev1alpha1.KubeDataLogDir
+	data["LogMountDir"] = hivev1alpha1.KubeDataLogConfigMountDir
+	data["HiveLog4j2Properties"] = HiveMetastoreLog4jName
 	s3TemplateData := CreateS3ScriptData(r.cr.Spec.ClusterConfig)
 	if len(krbTemplateData) > 0 {
 		maps.Copy(data, krbTemplateData)
@@ -291,6 +290,11 @@ func (r *DeploymentReconciler) make() (*appsv1.Deployment, error) {
 		if r.RoleGroupConfig().NodeSelector != nil {
 			dep.Spec.Template.Spec.NodeSelector = r.RoleGroupConfig().NodeSelector
 		}
+	}
+
+	// if vector is enabled, extend the workload
+	if isVectorEnabled := IsVectorEnable(r.RoleGroupConfig().Logging); isVectorEnabled {
+		ExtendWorkloadByVector(nil, dep, HiveMetaStoreConfigMapName(r.cr, r.roleGroupName))
 	}
 
 	// Set the ownerRef for the Deployment
@@ -362,31 +366,28 @@ func (r *DeploymentReconciler) EnabledLogging() bool {
 func (r *DeploymentReconciler) volumeMounts() []corev1.VolumeMount {
 	vms := []corev1.VolumeMount{
 		{
-			Name:      r.hiveSiteMountName(),
-			MountPath: hivev1alpha1.ZncDataConfigMountDir + "/hive-site.xml",
-			SubPath:   "hive-site.xml",
+			Name:      hivev1alpha1.KubeDataConfigDirName,
+			MountPath: hivev1alpha1.KubeDataConfigDir,
 		},
 		{
-			Name:      r.coreSiteMountName(),
-			MountPath: hivev1alpha1.ZncDataConfigMountDir + "/core-site.xml",
-			SubPath:   "core-site.xml",
+			Name:      hivev1alpha1.KubeDataLogDirName,
+			MountPath: hivev1alpha1.KubeDataLogDir,
+		},
+		{
+			Name:      hivev1alpha1.KubeDataConfigMountDirName,
+			MountPath: hivev1alpha1.KubeDataConfigMountDir,
 		},
 	}
 
-	if r.EnabledDataPVC() {
-		vms = append(vms, corev1.VolumeMount{
-			Name:      r.hiveDataMountName(),
-			MountPath: hivev1alpha1.WarehouseDir,
-		})
-	}
+	// vms = append(vms, corev1.VolumeMount{
+	// 	Name:      r.hiveDataMountName(),
+	// 	MountPath: hivev1alpha1.WarehouseDir,
+	// })
 
-	if r.EnabledLogging() {
-		vms = append(vms, corev1.VolumeMount{
-			Name:      r.log4jMountName(),
-			MountPath: "/opt/hive/conf/" + HiveMetastoreLog4jName,
-			SubPath:   HiveMetastoreLog4jName,
-		})
-	}
+	vms = append(vms, corev1.VolumeMount{
+		Name:      hivev1alpha1.KubeDataLogConfigMountDirName,
+		MountPath: hivev1alpha1.KubeDataLogConfigMountDir,
+	})
 
 	if IsKerberosEnabled(r.cr.Spec.ClusterConfig) {
 		vms = append(vms, KrbVolumeMount())
@@ -445,7 +446,7 @@ func (r *DeploymentReconciler) createContainer() corev1.Container {
 			},
 		},
 		Command: r.command(),
-		Args:    r.args(),
+		Args:    r.Args(),
 		Ports: []corev1.ContainerPort{
 			{
 				ContainerPort: 9083,

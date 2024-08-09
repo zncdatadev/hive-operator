@@ -148,3 +148,11 @@ bundle.Dockerfile
 
 kind-kubeconfig*
 kind-config-local.yaml
+
+# test
+ginkgo.report
+cover.out
+cmd/__debug*
+
+# ai code local
+.codiumai.toml

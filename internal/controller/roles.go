@@ -34,7 +34,7 @@ func NewMetastoreRole(
 }
 
 func (r *MetastoreRole) Name() string {
-	return "hivemetastore"
+	return RoleHiveMetaStore
 }
 
 func (r *MetastoreRole) EnabledClusterConfig() bool {
@@ -149,12 +149,12 @@ func (r *MetastoreRole) reconcileRoleGroup(
 		return result, nil
 	}
 
-	dataPVC := NewPVCReconciler(r.client, r.scheme, r.cr, name, roleGroup)
-	if result, err := dataPVC.Reconcile(ctx); err != nil {
-		return ctrl.Result{}, err
-	} else if result.RequeueAfter > 0 {
-		return result, nil
-	}
+	// dataPVC := NewPVCReconciler(r.client, r.scheme, r.cr, name, roleGroup)
+	// if result, err := dataPVC.Reconcile(ctx); err != nil {
+	// 	return ctrl.Result{}, err
+	// } else if result.RequeueAfter > 0 {
+	// 	return result, nil
+	// }
 
 	if result, err := NewReconcileService(r.client, r.scheme, r.GetLabels(), r.cr, name).Reconcile(ctx); err != nil {
 		return ctrl.Result{}, err

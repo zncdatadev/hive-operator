@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
 	"github.com/zncdatadev/operator-go/pkg/config"
 	"github.com/zncdatadev/secret-operator/pkg/volume"
@@ -83,6 +84,7 @@ func ParseKerberosScript(tmpl string, data map[string]interface{}) []string {
 	if content, err := parser.Parse(); err != nil {
 		panic(err)
 	} else {
+		fmt.Println(content)
 		return []string{content}
 	}
 }
@@ -94,9 +96,9 @@ func CreateKrbScriptData(clusterSpec *hivev1alpha1.ClusterConfigSpec) map[string
 			// if hdfs enabled, should exec below:
 			//sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {STACKABLE_CONFIG_DIR}/core-site.xml
 			//sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {STACKABLE_CONFIG_DIR}/hdfs-site.xml",
-			"kerberosScript": `export KERBEROS_REALM=$(grep -oP 'default_realm = \K.*' /zncdata/kerberos/krb5.conf)
-sed -i -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g" /zncdata/config/hive-site.xml
-`,
+			"kerberosScript": fmt.Sprintf(`export KERBEROS_REALM=$(grep -oP 'default_realm = \K.*' %s/krb5.conf)
+sed -i -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g" %s/hive-site.xml
+`, hivev1alpha1.KerberosMountPath, hivev1alpha1.KubeDataConfigDir),
 		}
 	}
 	return map[string]interface{}{}
