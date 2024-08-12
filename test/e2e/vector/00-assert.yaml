@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-aggregator
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vector-aggregator
+spec:
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vector-aggregator
+status:
+  replicas: 1
+---
+apiVersion: v1
+data:
+  ADDRESS: "vector-aggregator:6000"
+kind: ConfigMap
+metadata:
+  name: vector-aggregator-discovery
+

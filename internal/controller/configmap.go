@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
 	"github.com/zncdatadev/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
@@ -53,7 +54,7 @@ func (c *ConfigMapReconciler) Reconcile(ctx context.Context) (ctrl.Result, error
 }
 
 func (c *ConfigMapReconciler) apply(ctx context.Context) (ctrl.Result, error) {
-	obj, err := c.makeConfigmap()
+	obj, err := c.makeConfigmap(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -69,7 +70,7 @@ func (c *ConfigMapReconciler) apply(ctx context.Context) (ctrl.Result, error) {
 	return ctrl.Result{Requeue: false}, nil
 }
 
-func (c *ConfigMapReconciler) makeConfigmap() (*corev1.ConfigMap, error) {
+func (c *ConfigMapReconciler) makeConfigmap(ctx context.Context) (*corev1.ConfigMap, error) {
 	var data = make(map[string]string)
 
 	if hiveSiteXml, err := c.makeHiveSiteXml(); err != nil {
@@ -86,6 +87,20 @@ func (c *ConfigMapReconciler) makeConfigmap() (*corev1.ConfigMap, error) {
 		} else {
 			data["core-site.xml"] = coreSiteXml
 		}
+	}
+
+	if isVectorEnabled := IsVectorEnable(c.roleGroup.Config.Logging); isVectorEnabled {
+		ExtendConfigMapByVector(
+			ctx,
+			VectorConfigParams{
+				Client:        c.client,
+				ClusterConfig: c.cr.Spec.ClusterConfig,
+				Namespace:     c.cr.GetNamespace(),
+				InstanceName:  c.cr.GetName(),
+				Role:          RoleHiveMetaStore,
+				GroupName:     c.roleGroupName,
+			},
+			data)
 	}
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

@@ -2,9 +2,13 @@ package controller
 
 import (
 	"context"
+	"strings"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
+	"github.com/zncdatadev/operator-go/pkg/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,91 +18,43 @@ import (
 )
 
 const (
-	DefaultLog4jProperties = `# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+	ConsoleConversionPattern = "%d{ISO8601} %5p [%t] %c{2}: %m%n"
+	Log4j2PropertiesTemplate = `appenders = FILE, CONSOLE
 
-status = INFO
-name = HiveLog4j2
-packages = org.apache.hadoop.hive.ql.log
+appender.CONSOLE.type = Console
+appender.CONSOLE.name = CONSOLE
+appender.CONSOLE.target = SYSTEM_ERR
+appender.CONSOLE.layout.type = PatternLayout
+appender.CONSOLE.layout.pattern = {{.ConsoleConversionPattern}}
+appender.CONSOLE.filter.threshold.type = ThresholdFilter
+appender.CONSOLE.filter.threshold.level = {{.ConsoleLevel}}
 
-# list of properties
-property.hive.log.level = INFO
-property.hive.root.logger = DRFA
-property.hive.log.dir = ${sys:java.io.tmpdir}/${sys:user.name}
-property.hive.log.file = hive.log
-property.hive.perflogger.log.level = INFO
+appender.FILE.type = RollingFile
+appender.FILE.name = FILE
+appender.FILE.fileName = {{.LogDir}}/{{.LogFileName}}
+appender.FILE.filePattern = {{.LogDir}}/{{.LogFileName}}.%i
+appender.FILE.layout.type = XMLLayout
+appender.FILE.policies.type = Policies
+appender.FILE.policies.size.type = SizeBasedTriggeringPolicy
+appender.FILE.policies.size.size = {{.MaxLogFileSize}}
+appender.FILE.strategy.type = DefaultRolloverStrategy
+appender.FILE.strategy.max = 1
+appender.FILE.filter.threshold.type = ThresholdFilter
+appender.FILE.filter.threshold.level = {{.FileLevel}}
+{{ if .LoggerNames }}
+loggers = {{.LoggerNames}}
+{{ end -}}
+{{range $name, $levelSpec := .Loggers}}
+logger.{{ $name }}.name = {{ $name }}
+logger.{{ $name }}.level = {{ $levelSpec.Level -}}
+{{ end }}
 
-# list of all appenders
-appenders = console, DRFA
-
-# console appender
-appender.console.type = Console
-appender.console.name = console
-appender.console.target = SYSTEM_ERR
-appender.console.layout.type = PatternLayout
-appender.console.layout.pattern = %d{ISO8601} %5p [%t] %c{2}: %m%n
-
-# daily rolling file appender
-appender.DRFA.type = RollingRandomAccessFile
-appender.DRFA.name = DRFA
-appender.DRFA.fileName = ${sys:hive.log.dir}/${sys:hive.log.file}
-# Use %pid in the filePattern to append <process-id>@<host-name> to the filename if you want separate log files for different CLI session
-appender.DRFA.filePattern = ${sys:hive.log.dir}/${sys:hive.log.file}.%d{yyyy-MM-dd}
-appender.DRFA.layout.type = PatternLayout
-appender.DRFA.layout.pattern = %d{ISO8601} %5p [%t] %c{2}: %m%n
-appender.DRFA.policies.type = Policies
-appender.DRFA.policies.time.type = TimeBasedTriggeringPolicy
-appender.DRFA.policies.time.interval = 1
-appender.DRFA.policies.time.modulate = true
-appender.DRFA.strategy.type = DefaultRolloverStrategy
-appender.DRFA.strategy.max = 30
-
-# list of all loggers
-loggers = NIOServerCnxn, ClientCnxnSocketNIO, DataNucleus, Datastore, JPOX, PerfLogger, AmazonAws, ApacheHttp
-
-logger.NIOServerCnxn.name = org.apache.zookeeper.server.NIOServerCnxn
-logger.NIOServerCnxn.level = WARN
-
-logger.ClientCnxnSocketNIO.name = org.apache.zookeeper.ClientCnxnSocketNIO
-logger.ClientCnxnSocketNIO.level = WARN
-
-logger.DataNucleus.name = DataNucleus
-logger.DataNucleus.level = ERROR
-
-logger.Datastore.name = Datastore
-logger.Datastore.level = ERROR
-
-logger.JPOX.name = JPOX
-logger.JPOX.level = ERROR
-
-logger.AmazonAws.name=com.amazonaws
-logger.AmazonAws.level = INFO
-
-logger.ApacheHttp.name=org.apache.http
-logger.ApacheHttp.level = INFO
-
-logger.PerfLogger.name = org.apache.hadoop.hive.ql.log.PerfLogger
-logger.PerfLogger.level = ${sys:hive.perflogger.log.level}
-
-# root logger
-rootLogger.level = ${sys:hive.log.level}
-rootLogger.appenderRefs = root
-rootLogger.appenderRef.root.ref = ${sys:hive.root.logger}
+rootLogger.level = INFO
+rootLogger.appenderRefs = CONSOLE, FILE
+rootLogger.appenderRef.CONSOLE.ref = CONSOLE
+rootLogger.appenderRef.FILE.ref = FILE
 `
-	HiveMetastoreLog4jName = "hive-log4j2.properties"
+	HiveMetastoreLog4jName = "metastore-log4j2.properties"
 )
 
 type MetastoreLoggingRecociler struct {
@@ -157,14 +113,6 @@ func (r *MetastoreLoggingRecociler) make(data map[string]string) (*corev1.Config
 }
 
 func (r *MetastoreLoggingRecociler) Reconcile(ctx context.Context) (ctrl.Result, error) {
-	if !r.Enable() {
-		log.Info(
-			"Logging configuration is not enabled for role group, so skip.", "roleGroup",
-			r.roleGroupName,
-		)
-		return ctrl.Result{}, nil
-	}
-
 	log.Info("Reconciling Logging to configmap")
 
 	if res, err := r.apply(ctx); err != nil {
@@ -181,9 +129,7 @@ func (r *MetastoreLoggingRecociler) Reconcile(ctx context.Context) (ctrl.Result,
 func (r *MetastoreLoggingRecociler) apply(ctx context.Context) (ctrl.Result, error) {
 	data := make(map[string]string)
 
-	if r.roleGroup.Config.Logging.Metastore != nil {
-		data[HiveMetastoreLog4jName] = r.metastoreLog4j(r.roleGroup.Config.Logging.Metastore)
-	}
+	data[HiveMetastoreLog4jName] = r.metastoreLog4j(r.roleGroup.Config.Logging)
 
 	obj, err := r.make(data)
 	if err != nil {
@@ -199,39 +145,42 @@ func (r *MetastoreLoggingRecociler) apply(ctx context.Context) (ctrl.Result, err
 	return ctrl.Result{}, nil
 }
 
-func (r *MetastoreLoggingRecociler) metastoreLog4j(loggingConfig *hivev1alpha1.LoggingConfigSpec) string {
-	properties := make(map[string]string)
+func (r *MetastoreLoggingRecociler) metastoreLog4j(loggingConfig *hivev1alpha1.ContainerLoggingSpec) string {
+	data := make(map[string]interface{})
+	data["LogDir"] = hivev1alpha1.KubeDataLogDir + "/" + RoleHiveMetaStore
+	data["LogFileName"] = "hive.log4j2.xml"
+	data["MaxLogFileSize"] = "10MB"
 
-	if loggingConfig.Loggers != nil {
-		for k, level := range loggingConfig.Loggers {
-			if level != nil {
-				v := *level
-				properties["logger."+k+".level"] = v.Level
-			}
-		}
+	consoleLevel := "INFO"
+	fileLevel := "INFO"
+	if loggingConfig != nil && loggingConfig.Metastore != nil {
+		consoleLevel = GetLoggerLevel(loggingConfig.Metastore.Console != nil, func() string { return loggingConfig.Metastore.Console.Level }, consoleLevel)
+		fileLevel = GetLoggerLevel(loggingConfig.Metastore.File != nil, func() string { return loggingConfig.Metastore.File.Level }, fileLevel)
+		loggers := loggingConfig.Metastore.Loggers
+		data["LoggerNames"] = strings.Join(maps.Keys(loggers), ",")
+		data["Loggers"] = loggers
 	}
-	if loggingConfig.Console != nil {
-		properties["appender.console.filter.threshold.type"] = "ThresholdFilter"
-		properties["appender.console.filter.threshold.level"] = loggingConfig.Console.Level
+	data["ConsoleLevel"] = consoleLevel
+	data["FileLevel"] = fileLevel
+
+	parser := config.TemplateParser{
+		Value:    data,
+		Template: Log4j2PropertiesTemplate,
 	}
+	res, err := parser.Parse()
 
-	if loggingConfig.File != nil {
-		properties["appender.DRFA.filter.threshold.type"] = "ThresholdFilter"
-		properties["appender.DRFA.filter.threshold.level"] = loggingConfig.File.Level
+	if err != nil {
+		panic(err)
 	}
-
-	props := log4jProperties(properties)
-
-	return DefaultLog4jProperties +
-		"\n\n" +
-		"# hive-operator modify logging\n" +
-		props
+	return res
 }
 
-func log4jProperties(properties map[string]string) string {
-	data := ""
-	for k, v := range properties {
-		data += k + "=" + v + "\n"
+func GetLoggerLevel(condition bool, trueValFunc func() string, defaultVal string) string {
+	if condition {
+		trueVal := trueValFunc()
+		if strings.TrimSpace(trueVal) != "" {
+			return trueVal
+		}
 	}
-	return data
+	return defaultVal
 }

@@ -22,19 +22,27 @@ import (
 )
 
 const (
-	ZncDataConfigDirName = "zncdata-config"
+	KubeDataConfigDirName         = "config"
+	KubeDataConfigMountDirName    = "config-mount"
+	KubeDataLogDirName            = "log"
+	KubeDataLogConfigMountDirName = "log-config-mount"
 )
 
 const (
-	WarehouseDir          = "/opt/hive/data"
-	ImageRepository       = "quay.io/zncdatadev/hive"
-	ImageTag              = "4.0.0"
-	ImagePullPolicy       = corev1.PullAlways
-	KerberosMountPath     = "/zncdata/kerberos"
-	S3SecretDir           = "/zncdata/secrets"
-	TlsMountPath          = "/zncdata/tls"
-	ZncDataConfigDir      = "/zncdata/config"
-	ZncDataConfigMountDir = "/zncdata/mount/config"
+	WarehouseDir    = "/stackable/warehouse"
+	ImageRepository = "docker.stackable.tech/stackable/hive"
+	ImageTag        = "3.1.3-stackable24.7.0"
+	ImagePullPolicy = corev1.PullAlways
+
+	KubedataStackRoot = "/stackable"
+
+	KerberosMountPath         = KubedataStackRoot + "/kerberos"
+	S3SecretDir               = KubedataStackRoot + "/secrets"
+	TlsMountPath              = KubedataStackRoot + "/tls"
+	KubeDataLogDir            = KubedataStackRoot + "/log"
+	KubeDataConfigDir         = KubedataStackRoot + "/config"
+	KubeDataConfigMountDir    = KubedataStackRoot + "/mount/config"
+	KubeDataLogConfigMountDir = KubedataStackRoot + "/mount/log-config"
 )
 
 // +kubebuilder:object:root=true
@@ -60,11 +68,11 @@ type HiveMetastoreList struct {
 
 type ImageSpec struct {
 	// +kubebuilder:validation=Optional
-	// +kubebuilder:default=quay.io/zncdatadev/hive
+	// +kubebuilder:default="docker.stackable.tech/stackable/hive"
 	Repository string `json:"repository,omitempty"`
 
 	// +kubebuilder:validation=Optional
-	// +kubebuilder:default="4.0.0"
+	// +kubebuilder:default="3.1.3-stackable24.7.0"
 	Tag string `json:"tag,omitempty"`
 
 	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
@@ -88,6 +96,9 @@ type HiveMetastoreSpec struct {
 }
 
 type ClusterConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	VectorAggregatorConfigMapName string `json:"vectorAggregatorConfigMapName,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	Database *DatabaseSpec `json:"database,omitempty"`
 
@@ -197,7 +208,7 @@ type ConfigSpec struct {
 	GracefulShutdownTimeout *string `json:"gracefulShutdownTimeout,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="/opt/hive/data"
+	// +kubebuilder:default:="/stackable/warehouse"
 	WarehouseDir string `json:"warehouseDir,omitempty"`
 
 	// +kubebuilder:validation:Optional
