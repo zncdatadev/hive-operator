@@ -198,21 +198,6 @@ func (r *DeploymentReconciler) Args() []string {
 	args = append(args, `echo copying {{.ConfigMountDir}} to {{.ConfigDir}}
 cp -RL {{.ConfigMountDir}}/*.xml {{.ConfigDir}}/
 	`)
-
-	// temp work . todo
-	// 	args = append(args, `HADOOP_HOME="/kubedoop/hadoop"
-	// export HADOOP_YARN_HOME=${HADOOP_HOME}
-	// export HADOOP_MAPRED_HOME=${HADOOP_HOME}
-	// export PATH=${PATH}:${HIVE_HOME}/bin:${HADOOP_HOME}/bin
-	// `)
-
-	// debug
-	// args = append(args, `echo $HADOOP_YARN_HOME`)
-	// 	args = append(args, `
-	// while [ ! -f /tmp/debug ]; do
-	//   sleep 1
-	// done
-	// 	`)
 	// copy hive log4j config from mount to writeable folder
 	args = append(args, `echo copying {{.LogMountDir}}/{{.HiveLog4j2Properties}} to {{.ConfigDir}}/{{.HiveLog4j2Properties}}
 cp -RL {{.LogMountDir}}/* {{.ConfigDir}}/

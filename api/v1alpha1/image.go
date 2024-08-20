@@ -18,11 +18,11 @@ type ImageSpec struct {
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=quay.io/zncdatadev
-	Repository string `json:"repository,omitempty"`
+	Repo string `json:"repo,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="0.0.0-dev"
-	StackVersion string `json:"stackVersion,omitempty"`
+	PlatformVersion string `json:"platformVersion,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="3.1.3"
@@ -43,8 +43,8 @@ func TransformImage(imageSpec *ImageSpec) *util.Image {
 	}
 	return &util.Image{
 		Custom:         imageSpec.Custom,
-		Repository:     imageSpec.Repository,
-		StackVersion:   imageSpec.StackVersion,
+		Repository:     imageSpec.Repo,
+		StackVersion:   imageSpec.PlatformVersion,
 		ProductVersion: imageSpec.ProductVersion,
 		PullPolicy:     imageSpec.PullPolicy,
 		PullSecretName: imageSpec.PullSecretName,
