@@ -129,10 +129,6 @@ func (r *DeploymentReconciler) metastoreConfigMapName() string {
 	return MetastoreLog4jConfigMapName(r.cr, r.roleGroupName)
 }
 
-// func (r *DeploymentReconciler) hiveDataMountName() string {
-// 	return "warehouse"
-// }
-
 // volumes returns the volumes for the deployment
 func (r *DeploymentReconciler) createVolumes() []corev1.Volume {
 	vs := []corev1.Volume{
@@ -168,16 +164,6 @@ func (r *DeploymentReconciler) createVolumes() []corev1.Volume {
 		},
 	}
 
-	// if r.EnabledDataPVC() {
-	// 	vs = append(vs, corev1.Volume{
-	// 		Name: r.hiveDataMountName(),
-	// 		VolumeSource: corev1.VolumeSource{
-	// 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-	// 				ClaimName: HiveDataPVCName(r.cr, r.roleGroupName),
-	// 			},
-	// 		},
-	// 	})
-	// }
 	// log4j2 config dir, read only
 	vs = append(vs, corev1.Volume{
 		Name: hivev1alpha1.KubeDataLogConfigMountDirName,
@@ -213,6 +199,20 @@ func (r *DeploymentReconciler) Args() []string {
 cp -RL {{.ConfigMountDir}}/*.xml {{.ConfigDir}}/
 	`)
 
+	// temp work . todo
+	// 	args = append(args, `HADOOP_HOME="/kubedoop/hadoop"
+	// export HADOOP_YARN_HOME=${HADOOP_HOME}
+	// export HADOOP_MAPRED_HOME=${HADOOP_HOME}
+	// export PATH=${PATH}:${HIVE_HOME}/bin:${HADOOP_HOME}/bin
+	// `)
+
+	// debug
+	// args = append(args, `echo $HADOOP_YARN_HOME`)
+	// 	args = append(args, `
+	// while [ ! -f /tmp/debug ]; do
+	//   sleep 1
+	// done
+	// 	`)
 	// copy hive log4j config from mount to writeable folder
 	args = append(args, `echo copying {{.LogMountDir}}/{{.HiveLog4j2Properties}} to {{.ConfigDir}}/{{.HiveLog4j2Properties}}
 cp -RL {{.LogMountDir}}/* {{.ConfigDir}}/
@@ -333,17 +333,6 @@ func (r *DeploymentReconciler) addAffinity(dep *appsv1.Deployment) {
 	dep.Spec.Template.Spec.Affinity = affinity
 }
 
-func (r *DeploymentReconciler) Image() *hivev1alpha1.ImageSpec {
-	if r.cr.Spec.Image == nil {
-		return &hivev1alpha1.ImageSpec{
-			Repository: hivev1alpha1.ImageRepository,
-			Tag:        hivev1alpha1.ImageTag,
-			PullPolicy: hivev1alpha1.ImagePullPolicy,
-		}
-	}
-	return r.cr.Spec.Image
-}
-
 func (r *DeploymentReconciler) EnabledDataPVC() bool {
 	return r.RoleGroupConfig() != nil &&
 		r.RoleGroupConfig().Resources != nil &&
@@ -433,12 +422,12 @@ func (r *DeploymentReconciler) overrideEnv() []corev1.EnvVar {
 
 func (r *DeploymentReconciler) createContainer() corev1.Container {
 
-	image := r.Image()
+	image := hivev1alpha1.TransformImage(r.cr.Spec.Image)
 
 	obj := corev1.Container{
 		Name:            r.Name(),
-		Image:           image.Repository + ":" + image.Tag,
-		ImagePullPolicy: image.PullPolicy,
+		Image:           image.GetImageWithTag(),
+		ImagePullPolicy: *image.GetPullPolicy(),
 		Env: []corev1.EnvVar{
 			{
 				Name:  "SERVICE_NAME",
