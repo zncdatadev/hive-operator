@@ -42,11 +42,11 @@ func TransformImage(imageSpec *ImageSpec) *util.Image {
 		return util.NewImage(DefaultProductName, DefaultStackVersion, DefaultProductVersion)
 	}
 	return &util.Image{
-		Custom:         imageSpec.Custom,
-		Repository:     imageSpec.Repo,
-		StackVersion:   imageSpec.PlatformVersion,
-		ProductVersion: imageSpec.ProductVersion,
-		PullPolicy:     imageSpec.PullPolicy,
-		PullSecretName: imageSpec.PullSecretName,
+		Custom:          imageSpec.Custom,
+		Repo:            imageSpec.Repo,
+		PlatformVersion: imageSpec.PlatformVersion,
+		ProductVersion:  imageSpec.ProductVersion,
+		PullPolicy:      imageSpec.PullPolicy,
+		PullSecretName:  imageSpec.PullSecretName,
 	}
 }

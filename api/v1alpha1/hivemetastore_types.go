@@ -35,13 +35,13 @@ const (
 
 	KubedataStackRoot = "/kubedoop"
 
-	KerberosMountPath         = KubedataStackRoot + "/kerberos"
+	// KerberosMountPath         = KubedataStackRoot + "/kerberos"
 	S3SecretDir               = KubedataStackRoot + "/secrets"
-	TlsMountPath              = KubedataStackRoot + "/tls"
-	KubeDataLogDir            = KubedataStackRoot + "/log"
-	KubeDataConfigDir         = KubedataStackRoot + "/config"
-	KubeDataConfigMountDir    = KubedataStackRoot + "/mount/config"
-	KubeDataLogConfigMountDir = KubedataStackRoot + "/mount/log-config"
+	// TlsMountPath              = KubedataStackRoot + "/tls"
+	// KubeDataLogDir            = KubedataStackRoot + "/log"
+	// KubeDataConfigDir         = KubedataStackRoot + "/config"
+	// KubeDataConfigMountDir    = KubedataStackRoot + "/mount/config"
+	// KubeDataLogConfigMountDir = KubedataStackRoot + "/mount/log-config"
 )
 
 // +kubebuilder:object:root=true

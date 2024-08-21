@@ -9,6 +9,7 @@ import (
 
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
 	"github.com/zncdatadev/operator-go/pkg/config"
+	"github.com/zncdatadev/operator-go/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -147,7 +148,7 @@ func (r *MetastoreLoggingRecociler) apply(ctx context.Context) (ctrl.Result, err
 
 func (r *MetastoreLoggingRecociler) metastoreLog4j(loggingConfig *hivev1alpha1.ContainerLoggingSpec) string {
 	data := make(map[string]interface{})
-	data["LogDir"] = hivev1alpha1.KubeDataLogDir + "/" + RoleHiveMetaStore
+	data["LogDir"] = constants.KubedoopConfigDirMount + "/" + RoleHiveMetaStore
 	data["LogFileName"] = "hive.log4j2.xml"
 	data["MaxLogFileSize"] = "10MB"
 
