@@ -5,6 +5,7 @@ import (
 
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
 	"github.com/zncdatadev/operator-go/pkg/config"
+	"github.com/zncdatadev/operator-go/pkg/constants"
 	"github.com/zncdatadev/secret-operator/pkg/volume"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -20,7 +21,7 @@ func KrbHiveSiteXml(properties map[string]string, instanceName string, ns string
 	hostPart := PrincipalHostPart(instanceName, ns)
 	properties["hive.metastore.kerberos.principal"] = fmt.Sprintf("hive/%s", hostPart)
 	properties["hive.metastore.client.kerberos.principal"] = fmt.Sprintf("hive/%s", hostPart)
-	properties["hive.metastore.kerberos.keytab.file"] = fmt.Sprintf("%s/keytab", hivev1alpha1.KerberosMountPath)
+	properties["hive.metastore.kerberos.keytab.file"] = fmt.Sprintf("%s/keytab", constants.KubedoopKerberosDir)
 	properties["hive.metastore.sasl.enabled"] = "true"
 }
 
@@ -39,17 +40,17 @@ func KrbVolume(secretClass string, instanceName string) corev1.Volume {
 func KrbVolumeMount() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      KrbVolumeName,
-		MountPath: hivev1alpha1.KerberosMountPath,
+		MountPath: constants.KubedoopKerberosDir,
 	}
 }
 
 func KrbEnv(envs []corev1.EnvVar) []corev1.EnvVar {
 	envs = append(envs, corev1.EnvVar{
 		Name:  "KRB5_CONFIG",
-		Value: fmt.Sprintf("%s/krb5.conf", hivev1alpha1.KerberosMountPath),
+		Value: fmt.Sprintf("%s/krb5.conf", constants.KubedoopKerberosDir),
 	})
 
-	jvmKrbConfigArgs := fmt.Sprintf("-Djava.security.krb5.conf=%s/krb5.conf -Dhive.root.logger=console", hivev1alpha1.KerberosMountPath)
+	jvmKrbConfigArgs := fmt.Sprintf("-Djava.security.krb5.conf=%s/krb5.conf -Dhive.root.logger=console", constants.KubedoopKerberosDir)
 	serviceOptsExists := false
 	// Check if envs contains the Name=SERVICE_OPTS item
 	for i, env := range envs {
@@ -98,7 +99,7 @@ func CreateKrbScriptData(clusterSpec *hivev1alpha1.ClusterConfigSpec) map[string
 			//sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" /kubedoop/config/hdfs-site.xml",
 			"kerberosScript": fmt.Sprintf(`export KERBEROS_REALM=$(grep -oP 'default_realm = \K.*' %s/krb5.conf)
 sed -i -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g" %s/hive-site.xml
-`, hivev1alpha1.KerberosMountPath, hivev1alpha1.KubeDataConfigDir),
+`, constants.KubedoopKerberosDir, constants.KubedoopConfigDir),
 		}
 	}
 	return map[string]interface{}{}

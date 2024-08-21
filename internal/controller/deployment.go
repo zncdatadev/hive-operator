@@ -9,6 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
+	"github.com/zncdatadev/operator-go/pkg/constants"
+	"github.com/zncdatadev/operator-go/pkg/util"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -212,9 +214,9 @@ cp -RL {{.LogMountDir}}/* {{.ConfigDir}}/
 {{- .s3Script -}}
 {{- end }}`)
 	//common bash trap functions
-	args = append(args, COMMON_BASH_TRAP_FUNCTIONS)
+	args = append(args, util.CommonBashTrapFunctions)
 	//remove vector shutdown file command
-	args = append(args, RemoveVectorShutdownFileCommand("{{.LogDir}}"))
+	args = append(args, util.RemoveVectorShutdownFileCommand())
 	//hive executer
 	args = append(args, `prepare_signal_handlers
 DB_TYPE="${DB_DRIVER:-derby}"
@@ -223,15 +225,15 @@ bin/start-metastore --config {{.ConfigDir}} --db-type $DB_TYPE --hive-bin-dir bi
 wait_for_termination $!
 	`)
 	//create vector shutdown file command
-	args = append(args, CreateVectorShutdownFileCommand("{{.LogDir}}"))
+	args = append(args, util.CreateVectorShutdownFileCommand())
 	tmplate := strings.Join(args, "\n")
 
 	var data = make(map[string]interface{})
 	krbTemplateData := CreateKrbScriptData(r.cr.Spec.ClusterConfig)
-	data["ConfigDir"] = hivev1alpha1.KubeDataConfigDir
-	data["ConfigMountDir"] = hivev1alpha1.KubeDataConfigMountDir
-	data["LogDir"] = hivev1alpha1.KubeDataLogDir
-	data["LogMountDir"] = hivev1alpha1.KubeDataLogConfigMountDir
+	data["ConfigDir"] = constants.KubedoopConfigDir
+	data["ConfigMountDir"] = constants.KubedoopConfigDirMount
+	data["LogDir"] = constants.KubedoopConfigDirMount
+	data["LogMountDir"] = constants.KubedoopConfigDirMount
 	data["HiveLog4j2Properties"] = HiveMetastoreLog4jName
 	s3TemplateData := CreateS3ScriptData(r.cr.Spec.ClusterConfig)
 	if len(krbTemplateData) > 0 {
@@ -341,15 +343,15 @@ func (r *DeploymentReconciler) volumeMounts() []corev1.VolumeMount {
 	vms := []corev1.VolumeMount{
 		{
 			Name:      hivev1alpha1.KubeDataConfigDirName,
-			MountPath: hivev1alpha1.KubeDataConfigDir,
+			MountPath: constants.KubedoopConfigDir,
 		},
 		{
 			Name:      hivev1alpha1.KubeDataLogDirName,
-			MountPath: hivev1alpha1.KubeDataLogDir,
+			MountPath: constants.KubedoopLogDir,
 		},
 		{
 			Name:      hivev1alpha1.KubeDataConfigMountDirName,
-			MountPath: hivev1alpha1.KubeDataConfigMountDir,
+			MountPath: constants.KubedoopConfigDirMount,
 		},
 	}
 
@@ -360,7 +362,7 @@ func (r *DeploymentReconciler) volumeMounts() []corev1.VolumeMount {
 
 	vms = append(vms, corev1.VolumeMount{
 		Name:      hivev1alpha1.KubeDataLogConfigMountDirName,
-		MountPath: hivev1alpha1.KubeDataLogConfigMountDir,
+		MountPath: constants.KubedoopLogDirMount,
 	})
 
 	if IsKerberosEnabled(r.cr.Spec.ClusterConfig) {
