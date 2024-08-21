@@ -94,8 +94,8 @@ func CreateKrbScriptData(clusterSpec *hivev1alpha1.ClusterConfigSpec) map[string
 		return map[string]interface{}{
 			"kerberosEnabled": true,
 			// if hdfs enabled, should exec below:
-			//sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {STACKABLE_CONFIG_DIR}/core-site.xml
-			//sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" {STACKABLE_CONFIG_DIR}/hdfs-site.xml",
+			//sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" /kubedoop/config/core-site.xml
+			//sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" /kubedoop/config/hdfs-site.xml",
 			"kerberosScript": fmt.Sprintf(`export KERBEROS_REALM=$(grep -oP 'default_realm = \K.*' %s/krb5.conf)
 sed -i -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g" %s/hive-site.xml
 `, hivev1alpha1.KerberosMountPath, hivev1alpha1.KubeDataConfigDir),

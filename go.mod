@@ -8,7 +8,7 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/onsi/ginkgo/v2 v2.20.0
 	github.com/onsi/gomega v1.34.1
-	github.com/zncdatadev/operator-go v0.8.6
+	github.com/zncdatadev/operator-go v0.8.7-0.20240819085650-cb57861eedbe
 	github.com/zncdatadev/secret-operator v0.0.0-20240702125144-ea71dfd42d9f
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	k8s.io/api v0.30.2

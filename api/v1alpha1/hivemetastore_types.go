@@ -29,12 +29,11 @@ const (
 )
 
 const (
-	WarehouseDir    = "/stackable/warehouse"
-	ImageRepository = "docker.stackable.tech/stackable/hive"
-	ImageTag        = "3.1.3-stackable24.7.0"
+	WarehouseDir    = "/kubedoop/warehouse"
+	Image           = "quay.io/zncdatadev/hive:3.1.3-kubedoop0.0.0-dev"
 	ImagePullPolicy = corev1.PullAlways
 
-	KubedataStackRoot = "/stackable"
+	KubedataStackRoot = "/kubedoop"
 
 	KerberosMountPath         = KubedataStackRoot + "/kerberos"
 	S3SecretDir               = KubedataStackRoot + "/secrets"
@@ -64,20 +63,6 @@ type HiveMetastoreList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []HiveMetastore `json:"items"`
-}
-
-type ImageSpec struct {
-	// +kubebuilder:validation=Optional
-	// +kubebuilder:default="docker.stackable.tech/stackable/hive"
-	Repository string `json:"repository,omitempty"`
-
-	// +kubebuilder:validation=Optional
-	// +kubebuilder:default="3.1.3-stackable24.7.0"
-	Tag string `json:"tag,omitempty"`
-
-	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
-	// +kubebuilder:default=IfNotPresent
-	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
 }
 
 // HiveMetastoreSpec defines the desired state of HiveMetastore
@@ -208,7 +193,7 @@ type ConfigSpec struct {
 	GracefulShutdownTimeout *string `json:"gracefulShutdownTimeout,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="/stackable/warehouse"
+	// +kubebuilder:default:="/kubedoop/warehouse"
 	WarehouseDir string `json:"warehouseDir,omitempty"`
 
 	// +kubebuilder:validation:Optional

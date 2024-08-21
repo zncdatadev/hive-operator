@@ -15,7 +15,7 @@ spec:
     roleGroups:
       default:
         config:
-          warehouseDir: /stackable/warehouse
+          warehouseDir: /kubedoop/warehouse
           logging:
             enableVectorAgent: true
         replicas: 1

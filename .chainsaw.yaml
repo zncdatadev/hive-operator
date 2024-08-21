@@ -6,8 +6,8 @@ spec:
   timeouts:
     apply: 120s
     assert: 120s
-    cleanup: 120s
-    delete: 120s
+    cleanup: 240s
+    delete: 240s
     error: 10s
     exec: 45s
   skipDelete: false

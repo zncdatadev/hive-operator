@@ -152,7 +152,10 @@ kind-config-local.yaml
 # test
 ginkgo.report
 cover.out
-cmd/__debug*
+*__debug*
+**/coverage
 
 # ai code local
 .codiumai.toml
+
+
