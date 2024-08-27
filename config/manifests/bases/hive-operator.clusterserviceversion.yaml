@@ -43,8 +43,8 @@ spec:
   - name: hive
     url: https://hive.apache.org/
   maintainers:
-    - email: zncdatadev@googlegroups.com
-      name: ZNCDataDev Team
+  - email: zncdatadev@googlegroups.com
+    name: ZNCDataDev Team
   maturity: stable
   minKubeVersion: 1.26.1
   provider:
