@@ -246,7 +246,6 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle --select-optional suite=operatorframework --optional-values=k8s-version=1.26
 
-
 .PHONY: scorecard-test
 scorecard-test: bundle ## Run the scorecard tests
 	$(OPERATOR_SDK) scorecard bundle
@@ -299,8 +298,8 @@ endif
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
 CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:latest
 
-.PHONY: catalog-build
-catalog-build: opm ## Build a catalog manifests.
+.PHONY: catalog
+catalog: opm ## Build a catalog manifests.
 	mkdir -p catalog
 	@if ! test -f ./catalog.Dockerfile; then \
 		$(OPM) generate dockerfile catalog; \
@@ -308,16 +307,16 @@ catalog-build: opm ## Build a catalog manifests.
 	sed -E "s|(image: ).*-bundle:v$(VERSION)|\1$(BUNDLE_IMG)|g" catalog-template.yaml | \
 	$(OPM) alpha render-template basic -o yaml > catalog/catalog.yaml
 
-.PHONY: catalog-docker-build
+.PHONY: catalog-build
 catalog-docker-build: ## Build a catalog image.
 	$(CONTAINER_TOOL) build -t ${CATALOG_IMG} -f catalog.Dockerfile .
 
 # Push the catalog image.
-.PHONY: catalog-docker-push
+.PHONY: catalog-push
 catalog-docker-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
-.PHONY: catalog-docker-buildx
+.PHONY: catalog-buildx
 catalog-docker-buildx: ## Build and push a catalog image for cross-platform support
 	- $(CONTAINER_TOOL) buildx create --name project-v3-builder
 	$(CONTAINER_TOOL) buildx use project-v3-builder

@@ -1,30 +1,26 @@
-name: CI
+name: main
 
 on: ['push', 'pull_request']
 
 jobs:
-
-  golang-test:
-    name: Golang Test
+  markdown-lint:
+    name: Markdown Lint
     runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        go-version: ['1.22']
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout Code
+      uses: actions/checkout@v3
       with:
-        fetch-depth: 1
-    - uses: actions/checkout@v4
-    - name: Setup Go ${{ matrix.go-version }}
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ matrix.go-version }}
-    - name: Display Go version
-      run: go version
-    - name: Install dependencies
-      run: go get ./...
-    - name: Test with Go
-      run: make test
+        fetch-depth: 0
+    - name: Lint Code Base
+      uses: github/super-linter@v4
+      env:
+        VALIDATE_MARKDOWN: true
+        VALIDATE_ALL_CODEBASE: false
+        DEFAULT_BRANCH: main
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        LINTER_RULES_PATH: /
+        MARKDOWN_CONFIG_FILE: .markdownlint.yml
+
 
   golang-lint:
     name: Golang Lint
@@ -69,32 +65,71 @@ jobs:
         # Optional: The mode to install golangci-lint. It can be 'binary' or 'goinstall'.
         # install-mode: "goinstall"
 
-  markdown-lint:
-    name: Markdown Lint
+
+  golang-test:
+    name: Golang Test
     runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        go-version: ['1.22']
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v3
+    - uses: actions/checkout@v3
       with:
-        fetch-depth: 0
-    - name: Lint Code Base
-      uses: github/super-linter@v4
+        fetch-depth: 1
+    - uses: actions/checkout@v4
+    - name: Setup Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: Display Go version
+      run: go version
+    - name: Install dependencies
+      run: go get ./...
+    - name: Test with Go
+      run: make test
+
+
+
+  chainsaw-test:
+    name: Chainsaw Test
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        k8s-version: ['1.26.14', '1.27.11']
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+        cache: false
+    - name: Create KinD cluster
       env:
-        VALIDATE_MARKDOWN: true
-        VALIDATE_ALL_CODEBASE: false
-        DEFAULT_BRANCH: main
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        LINTER_RULES_PATH: /
-        MARKDOWN_CONFIG_FILE: .markdownlint.yml
+        KINDTEST_K8S_VERSION: ${{ matrix.k8s-version}}
+        KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+      run: make kind-create
+    - name: Chainsaw test setup
+      env:
+        KINDTEST_K8S_VERSION: ${{ matrix.k8s-version }}
+        KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+      run: make chainsaw-setup
+    - name: Test with Chainsaw
+      env:
+        KINDTEST_K8S_VERSION: ${{ matrix.k8s-version }}
+        KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+      run: make chainsaw-test
+
 
   deploy-operator:
     name: Deploy operator
-    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository_owner == 'zncdatadev'
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'zncdatadev' }}
     runs-on: ubuntu-22.04
     needs:
-    - golang-test
-    - markdown-lint
     - golang-lint
+    - golang-test
+    - chainsaw-test
     steps:
     - uses: actions/checkout@v3
       with:
@@ -111,13 +146,14 @@ jobs:
         registry: quay.io
         username: ${{ secrets.QUAY_USERNAME }}
         password: ${{ secrets.QUAY_PASSWORD }}
-
     - name: Build and push operator
       run: |
         make docker-buildx
-
     - name: Build and push operator bundle
       run: |
         make bundle
         make bundle-buildx
-
+    - name: Build and push catalog
+      run: |
+        make catalog
+        make catalog-buildx
