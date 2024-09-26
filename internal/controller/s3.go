@@ -1,181 +1,167 @@
 package controller
 
 import (
-	"fmt"
-	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
-	s3v1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
-	"github.com/zncdatadev/secret-operator/pkg/volume"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"context"
+	"net/url"
+	"path"
 	"strconv"
-)
+	"strings"
 
-//var s3ConfigLogger = ctrl.Log.WithName("s3-config")
+	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
+	"github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
+	"github.com/zncdatadev/operator-go/pkg/client"
+	"github.com/zncdatadev/operator-go/pkg/constants"
+	"github.com/zncdatadev/operator-go/pkg/util"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
+)
 
 const (
 	S3AccessKeyName = "ACCESS_KEY"
 	S3SecretKeyName = "SECRET_KEY"
 
-	S3Credentials = "s3-credentials"
+	S3VolumeName = "s3-credentials"
 )
 
-type S3Params struct {
-	Endpoint  string
-	Bucket    string
-	Region    string
-	SSL       bool
-	PathStyle bool
+// TODO: Add the tls verification
+type S3Connection struct {
+	Endpoint   url.URL
+	PathStyle  bool
+	credential *commonsv1alpha1.Credentials
 }
 
-type S3Configuration struct {
-	cr             *hivev1alpha1.HiveMetastore
-	ResourceClient ResourceClient
-}
-
-func NewS3Configuration(cr *hivev1alpha1.HiveMetastore, resourceClient ResourceClient) *S3Configuration {
-	return &S3Configuration{
-		cr:             cr,
-		ResourceClient: resourceClient,
-	}
-}
-
-func (s *S3Configuration) GetRefBucketName() string {
-	return *s.cr.Spec.ClusterConfig.S3Bucket.Reference
-}
-
-func (s *S3Configuration) Enabled() bool {
-	return s.cr.Spec.ClusterConfig != nil && s.cr.Spec.ClusterConfig.S3Bucket != nil
-}
-
-func (s *S3Configuration) GetRefBucket() (*s3v1alpha1.S3Bucket, error) {
-	s3BucketCR := &s3v1alpha1.S3Bucket{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: s.ResourceClient.Namespace,
-			Name:      s.GetRefBucketName(),
-		},
-	}
-	// Get Commons S3Bucket CR from the reference
-	if err := s.ResourceClient.Get(s3BucketCR); err != nil {
-		return nil, err
-	}
-	return s3BucketCR, nil
-}
-
-func (s *S3Configuration) GetRefConnection(name string) (*s3v1alpha1.S3Connection, error) {
-	S3ConnectionCR := &s3v1alpha1.S3Connection{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: s.ResourceClient.Namespace,
-			Name:      name,
-		},
-	}
-	if err := s.ResourceClient.Get(S3ConnectionCR); err != nil {
-		return nil, err
-	}
-	return S3ConnectionCR, nil
-}
-
-type S3Credential struct {
-	AccessKey string `json:"ACCESS_KEY"`
-	SecretKey string `json:"SECRET_KEY"`
-}
-
-func (s *S3Configuration) GetCredential(name string) (*S3Credential, error) {
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: s.ResourceClient.Namespace,
-			Name:      name,
-		},
-	}
-	if err := s.ResourceClient.Get(secret); err != nil {
-		return nil, err
-	}
-	ak := secret.Data[S3AccessKeyName]
-
-	sk := secret.Data[S3SecretKeyName]
-
-	return &S3Credential{
-		AccessKey: string(ak),
-		SecretKey: string(sk),
-	}, nil
-}
-
-func (s *S3Configuration) ExistingS3Bucket() bool {
-	return s.cr.Spec.ClusterConfig.S3Bucket.Reference != nil
-}
-
-func (s *S3Configuration) GetS3ParamsFromResource() (*S3Params, error) {
-
-	s3BucketCR, err := s.GetRefBucket()
-	if err != nil {
-		return nil, err
-	}
-	s3ConnectionCR, err := s.GetRefConnection(s3BucketCR.Spec.Reference)
-	if err != nil {
-		return nil, err
-	}
-	return &S3Params{
-		Endpoint:  s3ConnectionCR.Spec.Endpoint,
-		Region:    s3ConnectionCR.Spec.Region,
-		SSL:       s3ConnectionCR.Spec.SSL,
-		PathStyle: s3ConnectionCR.Spec.PathStyle,
-		Bucket:    s3BucketCR.Spec.BucketName,
-	}, nil
-}
-
-func (s *S3Configuration) GetS3ParamsFromInline() (*S3Params, error) {
-	s3BucketCR := s.cr.Spec.ClusterConfig.S3Bucket
-	return &S3Params{
-		Endpoint:  s3BucketCR.Inline.Endpoints,
-		Region:    s3BucketCR.Inline.Region,
-		SSL:       s3BucketCR.Inline.SSL,
-		PathStyle: s3BucketCR.Inline.PathStyle,
-		Bucket:    s3BucketCR.Inline.Bucket,
-	}, nil
-}
-
-func IsS3Enable(clusterSpec *hivev1alpha1.ClusterConfigSpec) bool {
-	return clusterSpec != nil && clusterSpec.S3Bucket != nil && clusterSpec.S3Bucket.Reference != nil
-}
-
-func S3HiveSiteXml(xmlProperties map[string]string, params *S3Params) {
-	xmlProperties["fs.s3a.endpoint"] = params.Endpoint
-	xmlProperties["hive.metastore.s3.path"] = params.Bucket
-	xmlProperties["fs.s3a.connection.ssl.enabled"] = strconv.FormatBool(params.SSL)
-	xmlProperties["fs.s3a.path.style.access"] = strconv.FormatBool(params.PathStyle)
-	xmlProperties["fs.s3a.impl"] = "org.apache.hadoop.fs.s3a.S3AFileSystem"
-	xmlProperties["fs.AbstractFileSystem.s3a.impl"] = "org.apache.hadoop.fs.s3a.S3A"
-}
-
-func S3Volume(secretClass *string) corev1.Volume {
-	if secretClass == nil {
-		panic("secretClass cannot be nil")
-	}
-	return SecretVolume(map[string]string{
-		volume.SecretsZncdataClass: *secretClass,
-	}, S3Credentials)
-}
-
-func S3VolumeMount() corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      S3Credentials,
-		MountPath: hivev1alpha1.S3SecretDir,
-	}
-}
-
-func CreateS3ScriptData(clusterSpec *hivev1alpha1.ClusterConfigSpec) map[string]interface{} {
-	if IsS3Enable(clusterSpec) {
-		return map[string]interface{}{
-			"s3Enabled": true,
-			"s3Script": fmt.Sprintf(`
-DIR="%s"
-for FILE in "$DIR"/*
-do
-    NAME=$(basename "$FILE")
-    VALUE=$(cat "$FILE")
-    export "$NAME"="$VALUE"
-done
-`, hivev1alpha1.S3SecretDir),
+func GetS3Connect(ctx context.Context, client *client.Client, s3 *hivev1alpha1.S3Spec) (*S3Connection, error) {
+	s3ConnectionSpec := s3.Inline
+	if s3.Reference != "" {
+		obj, err := GetRefreenceS3Connection(ctx, client, s3.Reference)
+		if err != nil {
+			return nil, err
 		}
+		s3ConnectionSpec = &obj.Spec
 	}
-	return map[string]interface{}{}
+
+	endpoint := url.URL{
+		Scheme: "http",
+		Host:   s3ConnectionSpec.Host,
+	}
+	if s3ConnectionSpec.Port != 0 {
+		endpoint.Host += ":" + strconv.Itoa(s3ConnectionSpec.Port)
+	}
+
+	return &S3Connection{
+		Endpoint:   endpoint,
+		PathStyle:  s3ConnectionSpec.PathStyle,
+		credential: s3ConnectionSpec.Credentials,
+	}, nil
+}
+
+func GetRefreenceS3Connection(ctx context.Context, client *client.Client, name string) (*v1alpha1.S3Connection, error) {
+	s3Connection := &v1alpha1.S3Connection{}
+	if err := client.GetWithOwnerNamespace(ctx, name, s3Connection); err != nil {
+		return nil, err
+	}
+	return s3Connection, nil
+}
+
+type S3Config struct {
+	S3Connection *S3Connection
+}
+
+func NewS3Config(
+	s3Connection *S3Connection,
+) *S3Config {
+	return &S3Config{S3Connection: s3Connection}
+}
+
+func (s *S3Config) GetMountPath() string {
+	return path.Join(constants.KubedoopSecretDir, "s3-credentials")
+}
+
+func (s *S3Config) GetVolumeName() string {
+	return S3VolumeName
+}
+
+func (s *S3Config) GetEndpoint() string {
+	return s.S3Connection.Endpoint.String()
+}
+
+func (s *S3Config) GetHiveSite() map[string]string {
+
+	sslEnabled := s.S3Connection.Endpoint.Scheme == "https"
+
+	properties := map[string]string{
+		"fs.s3a.endpoint":                s.GetEndpoint(),
+		"fs.s3a.path.style.access":       "true",
+		"fs.s3a.connection.ssl.enabled":  strconv.FormatBool(sslEnabled),
+		"fs.s3a.impl":                    "org.apache.hadoop.fs.s3a.S3AFileSystem",
+		"fs.AbstractFileSystem.s3a.impl": "org.apache.hadoop.fs.s3a.S3A",
+	}
+	return properties
+}
+
+func (s *S3Config) GetVolumes() []corev1.Volume {
+
+	credential := s.S3Connection.credential
+
+	secretClass := credential.SecretClass
+
+	annotations := map[string]string{
+		constants.AnnotationSecretsClass: secretClass,
+	}
+
+	if credential.Scope != nil {
+		scopes := []string{}
+		if credential.Scope.Node {
+			scopes = append(scopes, string(constants.NodeScope))
+		}
+		if credential.Scope.Pod {
+			scopes = append(scopes, string(constants.PodScope))
+		}
+		scopes = append(scopes, credential.Scope.Services...)
+
+		annotations[constants.AnnotationSecretsScope] = strings.Join(scopes, constants.CommonDelimiter)
+	}
+	secretVolume := corev1.Volume{
+		Name: s.GetVolumeName(),
+		VolumeSource: corev1.VolumeSource{
+			Ephemeral: &corev1.EphemeralVolumeSource{
+				VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: annotations,
+					},
+					Spec: corev1.PersistentVolumeClaimSpec{
+						AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						StorageClassName: constants.SecretStorageClassPtr(),
+						Resources: corev1.VolumeResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("1Mi"),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return []corev1.Volume{secretVolume}
+}
+
+func (s *S3Config) GetVolumeMount() *corev1.VolumeMount {
+	secretVolumeMount := &corev1.VolumeMount{
+		Name:      s.GetVolumeName(),
+		MountPath: s.GetMountPath(),
+	}
+
+	return secretVolumeMount
+}
+
+func (s *S3Config) GetContainerCommandArgs() string {
+	args := `
+export AWS_ACCESS_KEY_ID=$(cat ` + path.Join(s.GetMountPath(), S3AccessKeyName) + `)
+export AWS_SECRET_ACCESS_KEY=$(cat ` + path.Join(s.GetMountPath(), S3SecretKeyName) + `)
+`
+
+	return util.IndentTab4Spaces(args)
 }

@@ -1,490 +1,349 @@
 package controller
 
 import (
-	"context"
-	"maps"
+	"path"
 	"strings"
 	"time"
 
+	"github.com/zncdatadev/operator-go/pkg/builder"
+	client "github.com/zncdatadev/operator-go/pkg/client"
+	"github.com/zncdatadev/operator-go/pkg/constants"
+	"github.com/zncdatadev/operator-go/pkg/reconciler"
+	"github.com/zncdatadev/operator-go/pkg/util"
+	"golang.org/x/net/context"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
-	"github.com/zncdatadev/operator-go/pkg/constants"
-	"github.com/zncdatadev/operator-go/pkg/util"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type DeploymentReconciler struct {
-	*BaseRoleGroupResourceReconciler
-}
+var (
+	ConfigVolumeName  = "config"
+	LogVolumeName     = "log"
+	MetastorePortName = "metastore"
 
-func NewReconcileDeployment(
-	client client.Client,
-	schema *runtime.Scheme,
-	cr *hivev1alpha1.HiveMetastore,
-	roleName string,
-	roleGroupName string,
-	roleGroup *hivev1alpha1.RoleGroupSpec,
-	stop bool,
-) *DeploymentReconciler {
-
-	return &DeploymentReconciler{
-		&BaseRoleGroupResourceReconciler{
-			client:        client,
-			scheme:        schema,
-			cr:            cr,
-			roleName:      roleName,
-			roleGroupName: roleGroupName,
-			roleGroup:     roleGroup,
-			stop:          stop,
+	ContainerPort = []corev1.ContainerPort{
+		{
+			ContainerPort: 9083,
+			Protocol:      corev1.ProtocolTCP,
+			Name:          MetastorePortName,
 		},
 	}
+)
+
+type DeploymentBUilderOption struct {
+	ClusterName   string
+	RoleName      string
+	RoleGroupName string
+	Labels        map[string]string
+	Annotations   map[string]string
 }
 
-func (r *DeploymentReconciler) RoleGroupConfig() *hivev1alpha1.ConfigSpec {
-	return r.roleGroup.Config
+var _ builder.DeploymentBuilder = &DeploymentBuilder{}
+
+// TODO: Add Vector when vector bug fix
+type DeploymentBuilder struct {
+	builder.Deployment
+	Ports         []corev1.ContainerPort
+	ClusterName   string
+	RoleName      string
+	ClusterConfig *hivev1alpha1.ClusterConfigSpec
 }
 
-func (r *DeploymentReconciler) getTerminationGracePeriodSeconds() *int64 {
-	if r.roleGroup.Config.GracefulShutdownTimeout != nil {
-		if tiime, err := time.ParseDuration(*r.roleGroup.Config.GracefulShutdownTimeout); err == nil {
-			seconds := int64(tiime.Seconds())
-			return &seconds
-		}
+func NewDeploymentBuilder(
+	client *client.Client,
+	name string,
+	clusterConfig *hivev1alpha1.ClusterConfigSpec,
+	replicas *int32,
+	image *util.Image,
+	options builder.WorkloadOptions,
+) *DeploymentBuilder {
+
+	return &DeploymentBuilder{
+		Deployment: *builder.NewDeployment(
+			client,
+			name,
+			replicas,
+			image,
+			options,
+		),
+		// TODO: Add the ports
+		RoleName:      options.RoleName,
+		ClusterName:   options.ClusterName,
+		ClusterConfig: clusterConfig,
 	}
-	return nil
 }
 
-func (r *DeploymentReconciler) Reconcile(ctx context.Context) (ctrl.Result, error) {
-	log.Info("Reconciling Deployment")
-
-	if res, err := r.apply(ctx); err != nil {
-		return ctrl.Result{}, err
-	} else if res.RequeueAfter > 0 {
-		return res, nil
-	}
-
-	// Check if the pods are satisfied
-	satisfied, err := r.CheckPodsSatisfied(ctx)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if satisfied {
-		err = r.updateStatus(
-			metav1.ConditionTrue,
-			"DeploymentSatisfied",
-			"Deployment is satisfied",
-		)
+func (b *DeploymentBuilder) Build(ctx context.Context) (ctrlclient.Object, error) {
+	var s3Config *S3Config
+	if b.ClusterConfig.S3 != nil {
+		s3Connection, err := GetS3Connect(ctx, b.Client, b.ClusterConfig.S3)
 		if err != nil {
-			return ctrl.Result{}, err
+			return nil, err
 		}
-
-		return ctrl.Result{}, nil
+		s3Config = NewS3Config(s3Connection)
 	}
 
-	err = r.updateStatus(
-		metav1.ConditionFalse,
-		"DeploymentNotSatisfied",
-		"Deployment is not satisfied",
-	)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{RequeueAfter: time.Second * 10}, nil
-}
-
-func (r *DeploymentReconciler) getPodTemplate() corev1.PodTemplateSpec {
-	copyedPodTemplate := r.roleGroup.PodOverride.DeepCopy()
-	podTemplate := corev1.PodTemplateSpec{}
-
-	if copyedPodTemplate != nil {
-		podTemplate = *copyedPodTemplate
-	}
-
-	if podTemplate.ObjectMeta.Labels == nil {
-		podTemplate.ObjectMeta.Labels = make(map[string]string)
-	}
-
-	maps.Copy(podTemplate.ObjectMeta.Labels, r.GetLabels())
-
-	podTemplate.Spec.Containers = append(podTemplate.Spec.Containers, r.createContainer())
-
-	podTemplate.Spec.Volumes = append(podTemplate.Spec.Volumes, r.createVolumes()...)
-
-	seconds := r.getTerminationGracePeriodSeconds()
-	if r.roleGroup.Config.GracefulShutdownTimeout != nil {
-		podTemplate.Spec.TerminationGracePeriodSeconds = seconds
-	}
-
-	return podTemplate
-}
-
-func (r *DeploymentReconciler) metastoreConfigMapName() string {
-	return MetastoreLog4jConfigMapName(r.cr, r.roleGroupName)
-}
-
-// volumes returns the volumes for the deployment
-func (r *DeploymentReconciler) createVolumes() []corev1.Volume {
-	vs := []corev1.Volume{
-		{
-			// config dir, writeable
-			Name: hivev1alpha1.KubeDataConfigDirName,
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{
-					SizeLimit: func() *resource.Quantity { q := resource.MustParse("10Mi"); return &q }(),
-				},
-			},
-		},
-		{
-			// log dir
-			Name: hivev1alpha1.KubeDataLogDirName,
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{
-					SizeLimit: func() *resource.Quantity { q := resource.MustParse("30Mi"); return &q }(),
-				},
-			},
-		},
-		{
-			// config mount dir, read only
-			Name: hivev1alpha1.KubeDataConfigMountDirName,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					DefaultMode: func() *int32 { i := int32(0755); return &i }(),
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: HiveMetaStoreConfigMapName(r.cr, r.roleGroupName),
-					},
-				},
-			},
-		},
-	}
-
-	// log4j2 config dir, read only
-	vs = append(vs, corev1.Volume{
-		Name: hivev1alpha1.KubeDataLogConfigMountDirName,
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: r.metastoreConfigMapName(),
-				},
-			},
-		},
-	})
-	//kerberos
-	if IsKerberosEnabled(r.cr.Spec.ClusterConfig) {
-		secretClass := r.cr.Spec.ClusterConfig.Authentication.Kerberos.SecretClass
-		vs = append(vs, KrbVolume(secretClass, r.cr.Name))
-	}
-	// secret
-	if IsS3Enable(r.cr.Spec.ClusterConfig) {
-		secretClass := r.cr.Spec.ClusterConfig.S3Bucket.SecretClass
-		vs = append(vs, S3Volume(secretClass))
-	}
-	return vs
-}
-
-func (r *DeploymentReconciler) command() []string {
-	return []string{"/bin/bash", "-x", "-euo", "pipefail", "-c"}
-}
-
-func (r *DeploymentReconciler) Args() []string {
-	var args []string
-	// copy hive config from mount to writeable folder
-	args = append(args, `echo copying {{.ConfigMountDir}} to {{.ConfigDir}}
-cp -RL {{.ConfigMountDir}}/*.xml {{.ConfigDir}}/
-	`)
-	// copy hive log4j config from mount to writeable folder
-	args = append(args, `echo copying {{.LogMountDir}}/{{.HiveLog4j2Properties}} to {{.ConfigDir}}/{{.HiveLog4j2Properties}}
-cp -RL {{.LogMountDir}}/* {{.ConfigDir}}/
-	`)
-	// kerberos
-	args = append(args, `{{ if .kerberosEnabled }}
-{{- .kerberosScript -}}
-{{- end }}
-	`)
-	// s3
-	args = append(args, `{{ if .s3Enabled }}
-{{- .s3Script -}}
-{{- end }}`)
-	//common bash trap functions
-	args = append(args, util.CommonBashTrapFunctions)
-	//remove vector shutdown file command
-	args = append(args, util.RemoveVectorShutdownFileCommand())
-	//hive executer
-	args = append(args, `prepare_signal_handlers
-DB_TYPE="${DB_DRIVER:-derby}"
-echo "hive db type is $DB_TYPE"
-bin/start-metastore --config {{.ConfigDir}} --db-type $DB_TYPE --hive-bin-dir bin &
-wait_for_termination $!
-	`)
-	//create vector shutdown file command
-	args = append(args, util.CreateVectorShutdownFileCommand())
-	tmplate := strings.Join(args, "\n")
-
-	var data = make(map[string]interface{})
-	krbTemplateData := CreateKrbScriptData(r.cr.Spec.ClusterConfig)
-	data["ConfigDir"] = constants.KubedoopConfigDir
-	data["ConfigMountDir"] = constants.KubedoopConfigDirMount
-	data["LogDir"] = constants.KubedoopConfigDirMount
-	data["LogMountDir"] = constants.KubedoopConfigDirMount
-	data["HiveLog4j2Properties"] = HiveMetastoreLog4jName
-	s3TemplateData := CreateS3ScriptData(r.cr.Spec.ClusterConfig)
-	if len(krbTemplateData) > 0 {
-		maps.Copy(data, krbTemplateData)
-	}
-	if len(s3TemplateData) > 0 {
-		maps.Copy(data, s3TemplateData)
-	}
-	return ParseKerberosScript(tmplate, data)
-}
-
-func (r *DeploymentReconciler) replicas() int32 {
-	return r.roleGroup.Replicas
-}
-
-func (r *DeploymentReconciler) make() (*appsv1.Deployment, error) {
-	podTemplate := r.getPodTemplate()
-	replicas := r.replicas()
-	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.Name(),
-			Namespace: r.NameSpace(),
-			Labels:    r.GetLabels(),
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: r.GetLabels(),
-			},
-			Template: podTemplate,
-		},
-	}
-
-	if r.RoleGroupConfig() != nil {
-		r.addAffinity(dep)
-
-		if r.RoleGroupConfig().Tolerations != nil {
-			dep.Spec.Template.Spec.Tolerations = r.RoleGroupConfig().Tolerations
-		}
-
-		if r.RoleGroupConfig().NodeSelector != nil {
-			dep.Spec.Template.Spec.NodeSelector = r.RoleGroupConfig().NodeSelector
-		}
-	}
-
-	// if vector is enabled, extend the workload
-	if isVectorEnabled := IsVectorEnable(r.RoleGroupConfig().Logging); isVectorEnabled {
-		ExtendWorkloadByVector(nil, dep, HiveMetaStoreConfigMapName(r.cr, r.roleGroupName))
-	}
-
-	// Set the ownerRef for the Deployment
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/
-	if err := ctrl.SetControllerReference(r.cr, dep, r.scheme); err != nil {
-		return nil, err
-	}
-
-	return dep, nil
-}
-
-func (r *DeploymentReconciler) addAffinity(dep *appsv1.Deployment) {
-	var affinity *corev1.Affinity
-	if r.RoleGroupConfig().Affinity != nil {
-		affinity = r.RoleGroupConfig().Affinity
-	} else {
-		affinity = &corev1.Affinity{
-			PodAntiAffinity: &corev1.PodAntiAffinity{
-				PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-					{
-						Weight: 70,
-						PodAffinityTerm: corev1.PodAffinityTerm{
-							TopologyKey: corev1.LabelHostname,
-							LabelSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									LabelCrName:    strings.ToLower(r.cr.Name),
-									LabelComponent: r.roleName,
-								},
-							},
-						},
-					},
-				},
-			},
-		}
-	}
-	dep.Spec.Template.Spec.Affinity = affinity
-}
-
-func (r *DeploymentReconciler) EnabledDataPVC() bool {
-	return r.RoleGroupConfig() != nil &&
-		r.RoleGroupConfig().Resources != nil &&
-		r.RoleGroupConfig().Resources.Storage != nil
-
-}
-
-func (r *DeploymentReconciler) EnabledEnvSecret() bool {
-	return r.cr.Spec.ClusterConfig != nil &&
-		(r.cr.Spec.ClusterConfig.S3Bucket != nil || r.cr.Spec.ClusterConfig.Database != nil)
-}
-
-func (r *DeploymentReconciler) EnabledLogging() bool {
-	return r.RoleGroupConfig() != nil &&
-		r.RoleGroupConfig().Logging != nil &&
-		r.RoleGroupConfig().Logging.Metastore != nil
-}
-
-// volumeMounts returns the volume mounts for the container
-func (r *DeploymentReconciler) volumeMounts() []corev1.VolumeMount {
-	vms := []corev1.VolumeMount{
-		{
-			Name:      hivev1alpha1.KubeDataConfigDirName,
-			MountPath: constants.KubedoopConfigDir,
-		},
-		{
-			Name:      hivev1alpha1.KubeDataLogDirName,
-			MountPath: constants.KubedoopLogDir,
-		},
-		{
-			Name:      hivev1alpha1.KubeDataConfigMountDirName,
-			MountPath: constants.KubedoopConfigDirMount,
-		},
-	}
-
-	// vms = append(vms, corev1.VolumeMount{
-	// 	Name:      r.hiveDataMountName(),
-	// 	MountPath: hivev1alpha1.WarehouseDir,
-	// })
-
-	vms = append(vms, corev1.VolumeMount{
-		Name:      hivev1alpha1.KubeDataLogConfigMountDirName,
-		MountPath: constants.KubedoopLogDirMount,
-	})
-
-	if IsKerberosEnabled(r.cr.Spec.ClusterConfig) {
-		vms = append(vms, KrbVolumeMount())
-	}
-
-	if IsS3Enable(r.cr.Spec.ClusterConfig) {
-		vms = append(vms, S3VolumeMount())
-	}
-	return vms
-}
-
-func (r *DeploymentReconciler) containerFromEnvSecret() []corev1.EnvFromSource {
-	envs := make([]corev1.EnvFromSource, 0)
-	if r.EnabledEnvSecret() {
-		envs = append(
-			envs,
-			corev1.EnvFromSource{
-				SecretRef: &corev1.SecretEnvSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: HiveEnvSecretName(r.cr),
-					},
-				},
-			},
+	var kerberosConfig *KerberosConfig
+	if b.ClusterConfig.Authentication != nil {
+		kerberosConfig = NewKerberosConfig(
+			b.Client.GetOwnerNamespace(),
+			b.ClusterName,
+			b.RoleName,
+			b.ClusterConfig.Authentication.Kerberos.SecretClass,
 		)
 	}
-	return envs
+
+	b.AddContainer(b.getMainContainer(kerberosConfig, s3Config).Build())
+	b.AddVolumes(b.getVolumes(s3Config, kerberosConfig))
+
+	return b.GetObject()
 }
 
-func (r *DeploymentReconciler) overrideEnv() []corev1.EnvVar {
-	envs := make([]corev1.EnvVar, 0)
-	if r.roleGroup.EnvOverrides != nil {
-		for key, value := range r.roleGroup.EnvOverrides {
-			if key != "" {
-				envs = append(envs, corev1.EnvVar{
-					Name:  key,
-					Value: value,
-				})
+func (b *DeploymentBuilder) getMainContainer(krb5Config *KerberosConfig, s3Config *S3Config) *builder.Container {
+	container := builder.NewContainer(
+		b.RoleName,
+		b.GetImage(),
+	)
+	container.SetCommand([]string{"sh", "-x", "-euo", "pipefail", "-c"}).
+		SetArgs(b.getMainContainerCommandArgs(krb5Config, s3Config)).
+		AddEnvVars(b.getMainContainerEnv(krb5Config)).
+		AddPorts(ContainerPort).
+		SetReadinessProbe(&corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromString(MetastorePortName),
+				},
+			},
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       10,
+			FailureThreshold:    5,
+		}).
+		SetLivenessProbe(&corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromString(MetastorePortName),
+				},
+			},
+			InitialDelaySeconds: 30,
+			PeriodSeconds:       10,
+		})
+
+	return container
+}
+
+func (b *DeploymentBuilder) getMainContainerCommandArgs(
+	krb5Config *KerberosConfig,
+	S3Config *S3Config,
+) []string {
+	shutdownFile := path.Join(constants.KubedoopLogDir, "_vector", "shutdown")
+	args := []string{
+		`
+cp -RL ` + path.Join(constants.KubedoopConfigDirMount, "*") + ` ` + path.Join(constants.KubedoopConfigDir) + `
+`,
+	}
+
+	if krb5Config != nil {
+		args = append(args, krb5Config.GetContainerCommandArgs())
+	}
+
+	if S3Config != nil {
+		args = append(args, S3Config.GetContainerCommandArgs())
+	}
+	args = append(
+		args,
+		util.CommonBashTrapFunctions,
+		`
+rm -f `+shutdownFile+`
+`+util.InvokePrepareSignalHandlers+`
+DB_TYPE="${DB_DRIVER:-derby}"
+bin/start-metastore --config `+constants.KubedoopConfigDir+` --db-type $DB_TYPE --hive-bin-dir bin &
+`+util.InvokeWaitForTermination+`
+
+`+util.CreateVectorShutdownFileCommand()+`
+`,
+	)
+
+	return []string{strings.Join(args, "\n")}
+}
+
+func (b *DeploymentBuilder) getJVMOpts(
+	envs []corev1.EnvVar,
+) corev1.EnvVar {
+	jvmOpt := []string{
+		"-javaagent:" + path.Join(constants.KubedoopJmxDir, "jmx_prometheus_javaagent.jar") + "=8080:" + path.Join(constants.KubedoopConfigDir, "config.yaml"),
+	}
+
+	for _, env := range envs {
+		if env.Name == "HADOOP_OPTS" {
+			jvmOpt = append(jvmOpt, env.Value)
+		}
+	}
+
+	return corev1.EnvVar{
+		Name:  "HADOOP_OPTS",
+		Value: strings.Join(jvmOpt, " "),
+	}
+}
+
+func (b *DeploymentBuilder) getMetastoreJvmOpts() corev1.EnvVar {
+	jvmOpts := []string{}
+	// database is required in ClusterConfig
+	database := b.ClusterConfig.Database
+
+	switch database.DatabaseType {
+	case "mysql":
+		jvmOpts = append(jvmOpts,
+			"-Djavax.jdo.option.ConnectionURL="+database.ConnectionString,
+			"-Djavax.jdo.option.ConnectionDriverName=com.mysql.cj.jdbc.Driver")
+	case "postgresql":
+		jvmOpts = append(jvmOpts,
+			"-Djavax.jdo.option.ConnectionURL="+database.ConnectionString,
+			"-Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver")
+	case "oracle":
+		jvmOpts = append(jvmOpts,
+			"-Djavax.jdo.option.ConnectionURL="+database.ConnectionString,
+			"-Djavax.jdo.option.ConnectionDriverName=oracle.jdbc.OracleDriver")
+	case "derby":
+		jvmOpts = append(jvmOpts,
+			"-Djavax.jdo.option.ConnectionURL="+database.ConnectionString,
+			"-Djavax.jdo.option.ConnectionDriverName=org.apache.derby.jdbc.EmbeddedDriver")
+	default:
+		jvmOpts = append(jvmOpts,
+			"-Djavax.jdo.option.ConnectionURL=jdbc:derby:/tmp/metastore_db;create=true",
+			"-Djavax.jdo.option.ConnectionDriverName=org.apache.derby.jdbc.EmbeddedDriver")
+	}
+
+	// pass by env secret from database.credentials
+	jvmOpts = append(jvmOpts,
+		"-Djavax.jdo.option.ConnectionUserName=$(username)",
+		"-Djavax.jdo.option.ConnectionPassword=$(password)",
+	)
+
+	return corev1.EnvVar{
+		Name:  "HIVE_METASTORE_HADOOP_OPTS",
+		Value: strings.Join(jvmOpts, " "),
+	}
+}
+
+func (b *DeploymentBuilder) getMainContainerEnv(krb5Config *KerberosConfig) []corev1.EnvVar {
+
+	env := []corev1.EnvVar{
+		{
+			Name:  "SERVICE_NAME",
+			Value: "metastore",
+		},
+	}
+
+	jvmEnvs := make([]corev1.EnvVar, 0)
+
+	if krb5Config != nil {
+		krb5Envs := krb5Config.GetEnv()
+		for _, e := range krb5Envs {
+			if e.Name == "HADOOP_OPTS" {
+				jvmEnvs = append(jvmEnvs, e)
+			} else {
+				env = append(env, e)
 			}
 		}
 	}
-	return envs
+
+	env = append(env, b.getMetastoreJvmOpts())
+
+	env = append(env, b.getJVMOpts(jvmEnvs))
+
+	return env
 }
 
-func (r *DeploymentReconciler) createContainer() corev1.Container {
+// func (b *DeploymentBuilder) getVectorContainer() *builder.Container {
+// 	panic("not implemented")
+// }
 
-	image := hivev1alpha1.TransformImage(r.cr.Spec.Image)
-
-	obj := corev1.Container{
-		Name:            r.Name(),
-		Image:           image.GetImageWithTag(),
-		ImagePullPolicy: *image.GetPullPolicy(),
-		Env: []corev1.EnvVar{
-			{
-				Name:  "SERVICE_NAME",
-				Value: "metastore",
+func (b *DeploymentBuilder) getVolumes(s3Config *S3Config, krb5Cofig *KerberosConfig) []corev1.Volume {
+	volumes := []corev1.Volume{
+		{
+			Name: ConfigVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: b.Name,
+					},
+				},
 			},
 		},
-		Command: r.command(),
-		Args:    r.Args(),
-		Ports: []corev1.ContainerPort{
-			{
-				ContainerPort: 9083,
-				Protocol:      corev1.ProtocolTCP,
-				Name:          "tcp",
+		{
+			Name: LogVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: ptr.To(resource.MustParse("10Mi")),
+				},
 			},
 		},
-		VolumeMounts: r.volumeMounts(),
 	}
 
-	obj.EnvFrom = r.containerFromEnvSecret()
-
-	obj.Env = append(obj.Env, r.overrideEnv()...)
-
-	if IsKerberosEnabled(r.cr.Spec.ClusterConfig) {
-		obj.Env = KrbEnv(obj.Env)
+	if s3Config != nil {
+		volumes = append(volumes, s3Config.GetVolumes()...)
 	}
 
-	return obj
+	if krb5Cofig != nil {
+		volumes = append(volumes, krb5Cofig.GetVolumes()...)
+	}
+
+	return volumes
 }
 
-func (r *DeploymentReconciler) apply(ctx context.Context) (ctrl.Result, error) {
-	dep, err := r.make()
-
-	if err != nil {
-		return ctrl.Result{}, err
+func NewDeploymentReconciler(
+	client *client.Client,
+	roleGroupInfo reconciler.RoleGroupInfo,
+	clusterConfig *hivev1alpha1.ClusterConfigSpec,
+	ports []corev1.ContainerPort,
+	image *util.Image,
+	stopped bool,
+	spec *hivev1alpha1.RoleGroupSpec,
+) (*reconciler.Deployment, error) {
+	options := builder.WorkloadOptions{
+		Options: builder.Options{
+			ClusterName:   roleGroupInfo.ClusterName,
+			RoleName:      roleGroupInfo.RoleName,
+			RoleGroupName: roleGroupInfo.RoleGroupName,
+			Labels:        roleGroupInfo.GetLabels(),
+			Annotations:   roleGroupInfo.GetAnnotations(),
+		},
+		// PodOverrides:     spec.PodOverrides,
+		EnvOverrides:     spec.EnvOverrides,
+		CommandOverrides: spec.CommandOverrides,
 	}
 
-	mutant, err := CreateOrUpdate(ctx, r.client, dep)
-	if err != nil {
-		return ctrl.Result{}, err
+	if spec.Config != nil {
+		if spec.Config.GracefulShutdownTimeout != nil {
+			if gracefulShutdownTimeout, err := time.ParseDuration(*spec.Config.GracefulShutdownTimeout); err != nil {
+				return nil, err
+			} else {
+				options.TerminationGracePeriod = &gracefulShutdownTimeout
+			}
+
+		}
+
+		options.Affinity = spec.Config.Affinity
+		options.Resource = spec.Config.Resources
 	}
 
-	if mutant {
-		return ctrl.Result{RequeueAfter: time.Minute}, nil
-	}
-	return ctrl.Result{}, nil
-}
+	b := NewDeploymentBuilder(
+		client,
+		roleGroupInfo.GetFullName(),
+		clusterConfig,
+		&spec.Replicas,
+		image,
+		options,
+	)
 
-func (r *DeploymentReconciler) CheckPodsSatisfied(ctx context.Context) (bool, error) {
-	pods := corev1.PodList{}
-	podListOptions := []client.ListOption{
-		client.InNamespace(r.NameSpace()),
-		client.MatchingLabels(r.GetLabels()),
-	}
-	err := r.client.List(ctx, &pods, podListOptions...)
-	if err != nil {
-		return false, err
-	}
-
-	return len(pods.Items) == int(r.roleGroup.Replicas), nil
-}
-
-func (r *DeploymentReconciler) updateStatus(status metav1.ConditionStatus, reason string, message string) error {
-	apimeta.SetStatusCondition(&r.cr.Status.Conditions, metav1.Condition{
-		Type:               hivev1alpha1.ConditionTypeClusterAvailable,
-		Status:             status,
-		Reason:             reason,
-		Message:            message,
-		LastTransitionTime: metav1.Now(),
-		ObservedGeneration: r.cr.GetGeneration(),
-	})
-
-	return r.client.Status().Update(context.Background(), r.cr)
+	return reconciler.NewDeployment(
+		client,
+		roleGroupInfo.GetFullName(),
+		b,
+		stopped,
+	), nil
 }
