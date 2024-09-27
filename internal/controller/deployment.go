@@ -21,9 +21,10 @@ import (
 )
 
 var (
-	ConfigVolumeName  = "config"
-	LogVolumeName     = "log"
-	MetastorePortName = "metastore"
+	MatestoreConfigmapVolumeName = "mount-config" // configmap > volume > mount
+
+	MatestoreLogVolumeName = "log"
+	MetastorePortName      = "metastore"
 
 	ContainerPort = []corev1.ContainerPort{
 		{
@@ -111,7 +112,9 @@ func (b *DeploymentBuilder) getMainContainer(krb5Config *KerberosConfig, s3Confi
 	container.SetCommand([]string{"sh", "-x", "-euo", "pipefail", "-c"}).
 		SetArgs(b.getMainContainerCommandArgs(krb5Config, s3Config)).
 		AddEnvVars(b.getMainContainerEnv(krb5Config)).
+		AddEnvFromSecret(b.ClusterConfig.Database.CredentialsSecret).
 		AddPorts(ContainerPort).
+		AddVolumeMounts(b.getMainContainerVolumeMounts(s3Config, krb5Config)).
 		SetReadinessProbe(&corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
@@ -135,13 +138,11 @@ func (b *DeploymentBuilder) getMainContainer(krb5Config *KerberosConfig, s3Confi
 	return container
 }
 
-func (b *DeploymentBuilder) getMainContainerCommandArgs(
-	krb5Config *KerberosConfig,
-	S3Config *S3Config,
-) []string {
+func (b *DeploymentBuilder) getMainContainerCommandArgs(krb5Config *KerberosConfig, S3Config *S3Config) []string {
 	shutdownFile := path.Join(constants.KubedoopLogDir, "_vector", "shutdown")
 	args := []string{
 		`
+mkdir -p ` + constants.KubedoopConfigDir + `
 cp -RL ` + path.Join(constants.KubedoopConfigDirMount, "*") + ` ` + path.Join(constants.KubedoopConfigDir) + `
 `,
 	}
@@ -174,7 +175,7 @@ func (b *DeploymentBuilder) getJVMOpts(
 	envs []corev1.EnvVar,
 ) corev1.EnvVar {
 	jvmOpt := []string{
-		"-javaagent:" + path.Join(constants.KubedoopJmxDir, "jmx_prometheus_javaagent.jar") + "=8080:" + path.Join(constants.KubedoopConfigDir, "config.yaml"),
+		"-javaagent:" + path.Join(constants.KubedoopJmxDir, "jmx_prometheus_javaagent.jar") + "=8080:" + path.Join(constants.KubedoopJmxDir, "config.yaml"),
 	}
 
 	for _, env := range envs {
@@ -189,7 +190,8 @@ func (b *DeploymentBuilder) getJVMOpts(
 	}
 }
 
-func (b *DeploymentBuilder) getMetastoreJvmOpts() corev1.EnvVar {
+func (b *DeploymentBuilder) getMainContainerEnv(krb5Config *KerberosConfig) []corev1.EnvVar {
+
 	jvmOpts := []string{}
 	// database is required in ClusterConfig
 	database := b.ClusterConfig.Database
@@ -199,7 +201,7 @@ func (b *DeploymentBuilder) getMetastoreJvmOpts() corev1.EnvVar {
 		jvmOpts = append(jvmOpts,
 			"-Djavax.jdo.option.ConnectionURL="+database.ConnectionString,
 			"-Djavax.jdo.option.ConnectionDriverName=com.mysql.cj.jdbc.Driver")
-	case "postgresql":
+	case "postgres":
 		jvmOpts = append(jvmOpts,
 			"-Djavax.jdo.option.ConnectionURL="+database.ConnectionString,
 			"-Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver")
@@ -217,24 +219,26 @@ func (b *DeploymentBuilder) getMetastoreJvmOpts() corev1.EnvVar {
 			"-Djavax.jdo.option.ConnectionDriverName=org.apache.derby.jdbc.EmbeddedDriver")
 	}
 
-	// pass by env secret from database.credentials
-	jvmOpts = append(jvmOpts,
-		"-Djavax.jdo.option.ConnectionUserName=$(username)",
-		"-Djavax.jdo.option.ConnectionPassword=$(password)",
-	)
-
-	return corev1.EnvVar{
-		Name:  "HIVE_METASTORE_HADOOP_OPTS",
-		Value: strings.Join(jvmOpts, " "),
+	if database.DatabaseType != "derby" {
+		// pass by env secret from database.credentials
+		jvmOpts = append(jvmOpts,
+			"-Djavax.jdo.option.ConnectionUserName=$(username)",
+			"-Djavax.jdo.option.ConnectionPassword=$(password)",
+		)
 	}
-}
-
-func (b *DeploymentBuilder) getMainContainerEnv(krb5Config *KerberosConfig) []corev1.EnvVar {
 
 	env := []corev1.EnvVar{
 		{
 			Name:  "SERVICE_NAME",
 			Value: "metastore",
+		},
+		{
+			Name:  "HADOOP_CLIENT_OPTS",
+			Value: strings.Join(jvmOpts, " "),
+		},
+		{
+			Name:  "DB_DRIVER",
+			Value: database.DatabaseType,
 		},
 	}
 
@@ -251,8 +255,6 @@ func (b *DeploymentBuilder) getMainContainerEnv(krb5Config *KerberosConfig) []co
 		}
 	}
 
-	env = append(env, b.getMetastoreJvmOpts())
-
 	env = append(env, b.getJVMOpts(jvmEnvs))
 
 	return env
@@ -265,7 +267,7 @@ func (b *DeploymentBuilder) getMainContainerEnv(krb5Config *KerberosConfig) []co
 func (b *DeploymentBuilder) getVolumes(s3Config *S3Config, krb5Cofig *KerberosConfig) []corev1.Volume {
 	volumes := []corev1.Volume{
 		{
-			Name: ConfigVolumeName,
+			Name: MatestoreConfigmapVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -275,7 +277,7 @@ func (b *DeploymentBuilder) getVolumes(s3Config *S3Config, krb5Cofig *KerberosCo
 			},
 		},
 		{
-			Name: LogVolumeName,
+			Name: MatestoreLogVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{
 					SizeLimit: ptr.To(resource.MustParse("10Mi")),
@@ -293,6 +295,29 @@ func (b *DeploymentBuilder) getVolumes(s3Config *S3Config, krb5Cofig *KerberosCo
 	}
 
 	return volumes
+}
+
+func (b *DeploymentBuilder) getMainContainerVolumeMounts(s3Config *S3Config, krb5Cofig *KerberosConfig) []corev1.VolumeMount {
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      MatestoreConfigmapVolumeName,
+			MountPath: constants.KubedoopConfigDirMount,
+		},
+		{
+			Name:      MatestoreLogVolumeName,
+			MountPath: constants.KubedoopLogDir,
+		},
+	}
+
+	if s3Config != nil {
+		volumeMounts = append(volumeMounts, s3Config.GetVolumeMounts()...)
+	}
+
+	if krb5Cofig != nil {
+		volumeMounts = append(volumeMounts, krb5Cofig.GetVolumeMounts()...)
+	}
+
+	return volumeMounts
 }
 
 func NewDeploymentReconciler(

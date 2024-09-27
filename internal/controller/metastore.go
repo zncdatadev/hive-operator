@@ -69,7 +69,7 @@ func (r *RoleReconciler) GetImageResourceWithRoleGroup(ctx context.Context, info
 		r.Client,
 		r.ClusterConfig,
 		info,
-		spec,
+		*spec,
 	)
 
 	deployment, err := NewDeploymentReconciler(

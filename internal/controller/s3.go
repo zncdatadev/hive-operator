@@ -148,13 +148,13 @@ func (s *S3Config) GetVolumes() []corev1.Volume {
 	return []corev1.Volume{secretVolume}
 }
 
-func (s *S3Config) GetVolumeMount() *corev1.VolumeMount {
+func (s *S3Config) GetVolumeMounts() []corev1.VolumeMount {
 	secretVolumeMount := &corev1.VolumeMount{
 		Name:      s.GetVolumeName(),
 		MountPath: s.GetMountPath(),
 	}
 
-	return secretVolumeMount
+	return []corev1.VolumeMount{*secretVolumeMount}
 }
 
 func (s *S3Config) GetContainerCommandArgs() string {

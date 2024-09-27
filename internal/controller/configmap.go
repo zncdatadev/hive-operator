@@ -24,13 +24,14 @@ type ConfigMapBuilder struct {
 	RolegroupName string
 	ClusterConfig *hivev1alpha1.ClusterConfigSpec
 
-	Warehouse      string
-	productLogging *hivev1alpha1.LoggingSpec
+	RoleGroupConfig *hivev1alpha1.ConfigSpec
 }
 
 func NewConfigMapBuilder(
 	client *client.Client,
 	name string,
+	clusterConfig *hivev1alpha1.ClusterConfigSpec,
+	roleGroupConfig *hivev1alpha1.ConfigSpec,
 	options builder.Options,
 ) *ConfigMapBuilder {
 
@@ -41,22 +42,25 @@ func NewConfigMapBuilder(
 			options.Labels,
 			options.Annotations,
 		),
-		ClusterName:   options.ClusterName,
-		RoleName:      options.RoleName,
-		RolegroupName: options.RoleGroupName,
+		ClusterName:     options.ClusterName,
+		RoleName:        options.RoleName,
+		RolegroupName:   options.RoleGroupName,
+		ClusterConfig:   clusterConfig,
+		RoleGroupConfig: roleGroupConfig,
 	}
 }
 
 func (b *ConfigMapBuilder) Build(ctx context.Context) (ctrlclient.Object, error) {
-
+	var s3Connection *S3Connection
 	if b.ClusterConfig.S3 != nil {
-		s3Connection, err := GetS3Connect(ctx, b.Client, b.ClusterConfig.S3)
-		if err != nil {
+		if s, err := GetS3Connect(ctx, b.Client, b.ClusterConfig.S3); err != nil {
 			return nil, err
+		} else {
+			s3Connection = s
 		}
-		if err := b.addHiveSite(s3Connection); err != nil {
-			return nil, err
-		}
+	}
+	if err := b.addHiveSite(s3Connection); err != nil {
+		return nil, err
 	}
 
 	if err := b.addVectorConfig(ctx); err != nil {
@@ -73,7 +77,7 @@ func (b *ConfigMapBuilder) Build(ctx context.Context) (ctrlclient.Object, error)
 }
 
 func (b *ConfigMapBuilder) addVectorConfig(ctx context.Context) error {
-	if b.productLogging != nil && b.productLogging.EnableVectorAgent {
+	if b.RoleGroupConfig != nil && b.RoleGroupConfig.Logging != nil && b.RoleGroupConfig.Logging.EnableVectorAgent {
 		vectorConfig, err := productlogging.MakeVectorYaml(
 			ctx,
 			b.Client.Client,
@@ -92,8 +96,12 @@ func (b *ConfigMapBuilder) addVectorConfig(ctx context.Context) error {
 }
 
 func (b *ConfigMapBuilder) addHiveSite(s3Connection *S3Connection) error {
+	warehouseDir := hivev1alpha1.DefaultWarehouseDir
+	if b.RoleGroupConfig != nil {
+		warehouseDir = b.RoleGroupConfig.WarehouseDir
+	}
 	config := xml.NewXMLConfiguration()
-	config.AddPropertyWithString("hive.metastore.warehouse.dir", b.Warehouse, "Default is"+hivev1alpha1.DefaultWarehouseDir)
+	config.AddPropertyWithString("hive.metastore.warehouse.dir", warehouseDir, "Default is"+hivev1alpha1.DefaultWarehouseDir)
 
 	if s3Connection != nil {
 		s3Config := NewS3Config(s3Connection)
@@ -134,8 +142,10 @@ func (b *ConfigMapBuilder) addCoreSite() error {
 }
 
 func (b *ConfigMapBuilder) getLogConfig() *commonsv1alpha1.LoggingConfigSpec {
-	if log, ok := b.productLogging.Containers[b.RoleName]; ok {
-		return &log
+	if b.RoleGroupConfig != nil && b.RoleGroupConfig.Logging != nil {
+		if log, ok := b.RoleGroupConfig.Logging.Containers[b.RoleName]; ok {
+			return &log
+		}
 	}
 	return &commonsv1alpha1.LoggingConfigSpec{
 		Console: &commonsv1alpha1.LogLevelSpec{Level: "INFO"},
@@ -158,22 +168,17 @@ func (b *ConfigMapBuilder) addLog4j2() {
 	b.AddItem("metastore-log4j2.properties", s)
 }
 
-var _ reconciler.ResourceReconciler[*ConfigMapBuilder] = &ConfigMapReconciler[reconciler.AnySpec]{}
-
-type ConfigMapReconciler[T reconciler.AnySpec] struct {
-	reconciler.ResourceReconciler[*ConfigMapBuilder]
-	ClusterConfig *hivev1alpha1.ClusterConfigSpec
-}
-
-func NewConfigMapReconciler[T reconciler.AnySpec](
+func NewConfigMapReconciler(
 	client *client.Client,
 	clusterConfig *hivev1alpha1.ClusterConfigSpec,
 	options reconciler.RoleGroupInfo,
-	spec T,
-) *ConfigMapReconciler[T] {
+	spec hivev1alpha1.RoleGroupSpec,
+) *reconciler.GenericResourceReconciler[*ConfigMapBuilder] {
 	cmBuilder := NewConfigMapBuilder(
 		client,
 		options.GetFullName(),
+		clusterConfig,
+		spec.Config,
 		builder.Options{
 			ClusterName:   options.GetClusterName(),
 			RoleName:      options.GetRoleName(),
@@ -182,12 +187,9 @@ func NewConfigMapReconciler[T reconciler.AnySpec](
 			Annotations:   options.GetAnnotations(),
 		},
 	)
-	return &ConfigMapReconciler[T]{
-		ResourceReconciler: reconciler.NewGenericResourceReconciler[*ConfigMapBuilder](
-			client,
-			options.GetFullName(),
-			cmBuilder,
-		),
-		ClusterConfig: clusterConfig,
-	}
+	return reconciler.NewGenericResourceReconciler[*ConfigMapBuilder](
+		client,
+		options.GetFullName(),
+		cmBuilder,
+	)
 }

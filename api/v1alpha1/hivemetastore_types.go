@@ -106,7 +106,7 @@ type DatabaseSpec struct {
 
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default="derby"
-	// +kubebuilder:validation:enum=derby;mysql;postgresql;oracle
+	// +kubebuilder:validation:enum=derby;mysql;postgres;oracle
 	DatabaseType string `json:"databaseType"`
 
 	// +kubebuilder:validation:Required

@@ -102,7 +102,7 @@ func (c *KerberosConfig) GetVolumes() []corev1.Volume {
 	}
 }
 
-func (c *KerberosConfig) GetContainerVolumeMounts() []corev1.VolumeMount {
+func (c *KerberosConfig) GetVolumeMounts() []corev1.VolumeMount {
 	return []corev1.VolumeMount{
 		{
 			Name:      "kerberos",
