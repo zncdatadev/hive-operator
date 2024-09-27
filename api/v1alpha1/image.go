@@ -6,10 +6,10 @@ import (
 )
 
 const (
-	DefaultRepository     = "quay.io/zncdatadev"
-	DefaultProductVersion = "3.1.3"
-	DefaultProductName    = "hive"
-	DefaultStackVersion   = "0.0.0-dev"
+	DefaultRepository      = "quay.io/zncdatadev"
+	DefaultProductVersion  = "3.1.3"
+	DefaultProductName     = "hive"
+	DefaultKubedoopVersion = "0.0.0-dev"
 )
 
 type ImageSpec struct {
@@ -22,7 +22,7 @@ type ImageSpec struct {
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="0.0.0-dev"
-	PlatformVersion string `json:"platformVersion,omitempty"`
+	KubedoopVersion string `json:"kubedoopVersion,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="3.1.3"
@@ -31,7 +31,7 @@ type ImageSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=IfNotPresent
 	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
-	PullPolicy *corev1.PullPolicy `json:"pullPolicy,omitempty"`
+	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	PullSecretName string `json:"pullSecretName,omitempty"`
@@ -39,12 +39,12 @@ type ImageSpec struct {
 
 func TransformImage(imageSpec *ImageSpec) *util.Image {
 	if imageSpec == nil {
-		return util.NewImage(DefaultProductName, DefaultStackVersion, DefaultProductVersion)
+		return util.NewImage(DefaultProductName, DefaultKubedoopVersion, DefaultProductVersion)
 	}
 	return &util.Image{
 		Custom:          imageSpec.Custom,
 		Repo:            imageSpec.Repo,
-		PlatformVersion: imageSpec.PlatformVersion,
+		KubedoopVersion: imageSpec.KubedoopVersion,
 		ProductVersion:  imageSpec.ProductVersion,
 		PullPolicy:      imageSpec.PullPolicy,
 		PullSecretName:  imageSpec.PullSecretName,

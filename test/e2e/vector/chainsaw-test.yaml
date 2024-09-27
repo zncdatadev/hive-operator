@@ -1,0 +1,43 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: vector
+spec:
+  steps:
+  - try:
+    - apply:
+        file: vector-aggregator.yaml
+    - assert:
+        file: vector-aggregator-assert.yaml
+  - try:
+    - apply:
+        file: hive.yaml
+    - assert:
+        file: hive-assert.yaml
+  - try:
+    - sleep:
+        duration: 30s
+    - script:
+        env:
+          - name: NAMESPACES
+            value: ($namespace)
+        content: |
+          set -ex
+          kubectl -n $NAMESPACES logs --tail=-1 -l app.kubernetes.io/instance=vector-aggregator | grep derby
+        check:
+          ($error == null): true
+    catch:
+      - describe:
+          apiVersion: v1
+          kind: Pod
+          selector: app.kubernetes.io/managed-by=hive-operator
+      - podLogs:
+          selector: app.kubernetes.io/managed-by=hive-operator
+          tail: -1
+      - describe:
+          apiVersion: v1
+          kind: Pod
+          selector: app.kubernetes.io/instance=vector-aggregator
+      - podLogs:
+          selector: app.kubernetes.io/instance=vector-aggregator
+          tail: -1

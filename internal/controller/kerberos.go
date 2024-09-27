@@ -2,105 +2,127 @@ package controller
 
 import (
 	"fmt"
+	"path"
+	"strings"
 
-	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
-	"github.com/zncdatadev/operator-go/pkg/config"
 	"github.com/zncdatadev/operator-go/pkg/constants"
-	"github.com/zncdatadev/secret-operator/pkg/volume"
+	"github.com/zncdatadev/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const KrbVolumeName = "kerberos"
-const HiveKerberosServiceName = "hive"
+var (
+	Krb5ConfigFile = path.Join(constants.KubedoopKerberosDir, "krb5.conf")
+)
 
-func IsKerberosEnabled(clusterSpec *hivev1alpha1.ClusterConfigSpec) bool {
-	return clusterSpec != nil && clusterSpec.Authentication != nil && clusterSpec.Authentication.Kerberos != nil
+type KerberosConfig struct {
+	Namespace   string
+	ClusterName string
+	RoleName    string
+
+	KerberosSecretClass string
+	HdfsEnabled         bool
 }
 
-func KrbHiveSiteXml(properties map[string]string, instanceName string, ns string) {
-	hostPart := PrincipalHostPart(instanceName, ns)
-	properties["hive.metastore.kerberos.principal"] = fmt.Sprintf("hive/%s", hostPart)
-	properties["hive.metastore.client.kerberos.principal"] = fmt.Sprintf("hive/%s", hostPart)
-	properties["hive.metastore.kerberos.keytab.file"] = fmt.Sprintf("%s/keytab", constants.KubedoopKerberosDir)
-	properties["hive.metastore.sasl.enabled"] = "true"
-}
-
-func PrincipalHostPart(instanceName string, ns string) string {
-	return fmt.Sprintf("%s.%s.svc.cluster.local@${env.KERBEROS_REALM}", instanceName, ns)
-}
-
-func KrbVolume(secretClass string, instanceName string) corev1.Volume {
-	return SecretVolume(map[string]string{
-		volume.SecretsZncdataClass:                secretClass,
-		volume.SecretsZncdataScope:                fmt.Sprintf("service=%s", instanceName),
-		volume.SecretsZncdataKerberosServiceNames: HiveKerberosServiceName + ",HTTP",
-	}, KrbVolumeName)
-}
-
-func KrbVolumeMount() corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      KrbVolumeName,
-		MountPath: constants.KubedoopKerberosDir,
+func NewKerberosConfig(
+	namespace string,
+	clustername string,
+	rolename string,
+	krb5SecretClass string,
+) *KerberosConfig {
+	return &KerberosConfig{
+		Namespace:           namespace,
+		ClusterName:         clustername,
+		RoleName:            rolename,
+		KerberosSecretClass: krb5SecretClass,
 	}
 }
 
-func KrbEnv(envs []corev1.EnvVar) []corev1.EnvVar {
-	envs = append(envs, corev1.EnvVar{
-		Name:  "KRB5_CONFIG",
-		Value: fmt.Sprintf("%s/krb5.conf", constants.KubedoopKerberosDir),
-	})
-
-	jvmKrbConfigArgs := fmt.Sprintf("-Djava.security.krb5.conf=%s/krb5.conf -Dhive.root.logger=console", constants.KubedoopKerberosDir)
-	serviceOptsExists := false
-	// Check if envs contains the Name=SERVICE_OPTS item
-	for i, env := range envs {
-		if env.Name == "SERVICE_OPTS" {
-			serviceOptsExists = true
-			// Append the specified value to the existing SERVICE_OPTS item
-			envs[i].Value += " " + jvmKrbConfigArgs
-			break
-		}
-	}
-	// If SERVICE_OPTS item doesn't exist, add it with the specified value
-	if !serviceOptsExists {
-		envs = append(envs, corev1.EnvVar{
-			Name:  "SERVICE_OPTS",
-			Value: jvmKrbConfigArgs,
-		})
-	}
-	return envs
-}
-
-// KrbCoreSiteXml if kerberos is activated but we have no HDFS as backend (i.e. S3) then a core-site.xml is
-// needed to set "hadoop.security.authentication"
-func KrbCoreSiteXml(coreSiteProperties map[string]string) {
-	coreSiteProperties["hadoop.security.authentication"] = "kerberos"
-}
-
-func ParseKerberosScript(tmpl string, data map[string]interface{}) []string {
-	parser := config.TemplateParser{
-		Value:    data,
-		Template: tmpl,
-	}
-	if content, err := parser.Parse(); err != nil {
-		panic(err)
-	} else {
-		fmt.Println(content)
-		return []string{content}
+func (c *KerberosConfig) GetHiveSite() map[string]string {
+	return map[string]string{
+		"hive.metastore.sasl.enabled":              "true",
+		"hive.metastore.kerberos.principal":        c.getPrincipal("hive"),
+		"hive.metastore.client.kerberos.principal": c.getPrincipal("hive"),
+		"hive.metastore.kerberos.keytab.file":      path.Join(constants.KubedoopKerberosDir, "keytab"),
 	}
 }
 
-func CreateKrbScriptData(clusterSpec *hivev1alpha1.ClusterConfigSpec) map[string]interface{} {
-	if IsKerberosEnabled(clusterSpec) {
-		return map[string]interface{}{
-			"kerberosEnabled": true,
-			// if hdfs enabled, should exec below:
-			//sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" /kubedoop/config/core-site.xml
-			//sed -i -e 's/${{env.KERBEROS_REALM}}/'\"$KERBEROS_REALM/g\" /kubedoop/config/hdfs-site.xml",
-			"kerberosScript": fmt.Sprintf(`export KERBEROS_REALM=$(grep -oP 'default_realm = \K.*' %s/krb5.conf)
-sed -i -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g" %s/hive-site.xml
-`, constants.KubedoopKerberosDir, constants.KubedoopConfigDir),
-		}
+func (c *KerberosConfig) getPrincipal(service string) string {
+	host := fmt.Sprintf("%s.%s.svc.cluster.local", c.ClusterName, c.Namespace)
+	return fmt.Sprintf("%s/%s@${env.KERBEROS_REALM}", service, host)
+}
+
+func (c *KerberosConfig) GetCoreSite() map[string]string {
+	return map[string]string{
+		"hadoop.security.authentication": "kerberos",
 	}
-	return map[string]interface{}{}
+}
+
+func (c *KerberosConfig) GetEnv() []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{
+			Name:  "KRB5_CONFIG",
+			Value: Krb5ConfigFile,
+		},
+		{
+			Name:  "HADOOP_OPTS",
+			Value: fmt.Sprintf("-Djava.security.krb5.conf=%s/krb5.conf -Dhive.root.logger=console", constants.KubedoopKerberosDir),
+		},
+	}
+}
+
+func (c *KerberosConfig) GetVolumes() []corev1.Volume {
+	return []corev1.Volume{
+		{
+			Name: "kerberos",
+			VolumeSource: corev1.VolumeSource{
+				Ephemeral: &corev1.EphemeralVolumeSource{
+					VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.AnnotationSecretsClass:                c.KerberosSecretClass,
+								constants.AnnotationSecretsScope:                fmt.Sprintf("service=%s", c.ClusterName),
+								constants.AnnotationSecretsKerberosServiceNames: strings.Join([]string{c.RoleName, "HTTP"}, constants.CommonDelimiter),
+							},
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							StorageClassName: constants.SecretStorageClassPtr(),
+							AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("1Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (c *KerberosConfig) GetVolumeMounts() []corev1.VolumeMount {
+	return []corev1.VolumeMount{
+		{
+			Name:      "kerberos",
+			MountPath: constants.KubedoopKerberosDir,
+		},
+	}
+}
+
+func (c *KerberosConfig) GetContainerCommandArgs() string {
+	cmds := `
+export KERBEROS_REALM=$(grep -oP 'default_realm = \K.*' ` + Krb5ConfigFile + `)
+sed -i -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g"  ` + path.Join(constants.KubedoopConfigDir, "hive-site.xml") + `
+`
+
+	if c.HdfsEnabled {
+		cmds += `
+sed -i -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g"  ` + path.Join(constants.KubedoopConfigDir, "core-site.xml") + `
+sed -i -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g"  ` + path.Join(constants.KubedoopConfigDir, "hdfs-site.xml") + `
+`
+	}
+
+	return util.IndentTab4Spaces(cmds)
 }

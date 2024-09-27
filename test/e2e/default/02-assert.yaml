@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hive-derby-metastore-default
+  name: hive-pg-metastore-default
 status:
   availableReplicas: 1
   readyReplicas: 1
@@ -10,4 +10,4 @@ status:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: hive-derby-metastore-default
+  name: hive-pg-metastore-default

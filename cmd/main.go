@@ -33,7 +33,6 @@ import (
 
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
 	"github.com/zncdatadev/hive-operator/internal/controller"
-	databasev1alph1 "github.com/zncdatadev/operator-go/pkg/apis/database/v1alpha1"
 	s3v1alph1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
@@ -50,7 +49,6 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 
 	utilruntime.Must(s3v1alph1.AddToScheme(scheme))
-	utilruntime.Must(databasev1alph1.AddToScheme(scheme))
 }
 
 func main() {

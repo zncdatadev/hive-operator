@@ -19,22 +19,23 @@ package controller
 import (
 	"context"
 
-	"github.com/go-logr/logr"
-	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
+	"github.com/zncdatadev/operator-go/pkg/client"
+	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-)
 
-//const memcachedFinalizer = "hive.zncdata.dev/finalizer"
+	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
+)
 
 var log = logf.Log.WithName("hive-metastore-controller")
 
 // HiveMetastoreReconciler reconciles a HiveMetastore object
 type HiveMetastoreReconciler struct {
-	client.Client
+	ctrlclient.Client
 	Scheme *runtime.Scheme
 }
 
@@ -44,17 +45,16 @@ type HiveMetastoreReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups=s3.zncdata.dev,resources=s3connections,verbs=get;list;watch
+// +kubebuilder:rbac:groups=s3.zncdata.dev,resources=s3buckets,verbs=get;list;watch
 
 func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log.Info("Reconciling instance")
 	defer log.V(2).Info("Successfully reconciled hiveMetastore")
 
-	existingInstance := &hivev1alpha1.HiveMetastore{}
-	if err := r.Get(ctx, req.NamespacedName, existingInstance); err != nil {
+	instance := &hivev1alpha1.HiveMetastore{}
+	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(3).Info("Cannot find HiveMetastore instance, may have been deleted")
 			return ctrl.Result{}, nil
@@ -63,45 +63,28 @@ func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	log.V(2).Info("HiveMetastore found", "Name", existingInstance.Name)
-
-	if r.ReconciliationPaused(ctx, existingInstance) {
-		log.V(0).Info("Reconciliation paused")
-		return ctrl.Result{}, nil
+	log.V(2).Info("HiveMetastore found", "Name", instance.Name)
+	resourceClient := &client.Client{
+		Client:         r.Client,
+		OwnerReference: instance,
 	}
 
-	result, err := NewClusterReconciler(r.Client, r.Scheme, existingInstance).Reconcile(ctx)
-	if err != nil {
+	clusterInfo := reconciler.ClusterInfo{
+		GVK: &metav1.GroupVersionKind{
+			Group:   hivev1alpha1.GroupVersion.Group,
+			Version: hivev1alpha1.GroupVersion.Version,
+			Kind:    "HiveMetastore",
+		},
+		ClusterName: instance.Name,
+	}
+
+	reconciler := NewClusterReconciler(resourceClient, clusterInfo, &instance.Spec)
+
+	if err := reconciler.RegisterResource(ctx); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	return result, nil
-}
-
-type ResourceClient struct {
-	Ctx       context.Context
-	Client    client.Client
-	Namespace string
-	Log       logr.Logger
-}
-
-func (r *ResourceClient) Get(obj client.Object) error {
-	name := obj.GetName()
-	kind := obj.GetObjectKind()
-	if err := r.Client.Get(r.Ctx, client.ObjectKey{Namespace: r.Namespace, Name: name}, obj); err != nil {
-		opt := []any{"ns", r.Namespace, "name", name, "kind", kind}
-		if apierrors.IsNotFound(err) {
-			r.Log.Error(err, "Fetch resource NotFound", opt...)
-		} else {
-			r.Log.Error(err, "Fetch resource occur some unknown err", opt...)
-		}
-		return err
-	}
-	return nil
-}
-
-func (r *HiveMetastoreReconciler) ReconciliationPaused(ctx context.Context, instance *hivev1alpha1.HiveMetastore) bool {
-	return instance.Spec.ClusterOperation != nil && instance.Spec.ClusterOperation.ReconciliationPaused
+	return reconciler.Run(ctx)
 }
 
 // SetupWithManager sets up the controller with the Manager.
