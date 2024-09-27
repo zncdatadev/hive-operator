@@ -160,7 +160,7 @@ func (b *ConfigMapBuilder) addLog4j2() {
 		b.RoleName,
 		"%d{ISO8601} %5p [%t] %c{2}: %m%n",
 		nil,
-		"hive.lo4j2.xml",
+		"hive.log4j2.xml",
 		"",
 	)
 

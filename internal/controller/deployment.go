@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"path"
 	"strings"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/zncdatadev/operator-go/pkg/constants"
 	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	"github.com/zncdatadev/operator-go/pkg/util"
-	"golang.org/x/net/context"
+	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -45,24 +46,23 @@ type DeploymentBUilderOption struct {
 
 var _ builder.DeploymentBuilder = &DeploymentBuilder{}
 
-// TODO: Add Vector when vector bug fix
 type DeploymentBuilder struct {
 	builder.Deployment
-	Ports         []corev1.ContainerPort
-	ClusterName   string
-	RoleName      string
-	ClusterConfig *hivev1alpha1.ClusterConfigSpec
+	ClusterName     string
+	RoleName        string
+	ClusterConfig   *hivev1alpha1.ClusterConfigSpec
+	RoleGroupConfig *hivev1alpha1.ConfigSpec
 }
 
 func NewDeploymentBuilder(
 	client *client.Client,
 	name string,
 	clusterConfig *hivev1alpha1.ClusterConfigSpec,
+	roleGroupConfig *hivev1alpha1.ConfigSpec,
 	replicas *int32,
 	image *util.Image,
 	options builder.WorkloadOptions,
 ) *DeploymentBuilder {
-
 	return &DeploymentBuilder{
 		Deployment: *builder.NewDeployment(
 			client,
@@ -71,10 +71,10 @@ func NewDeploymentBuilder(
 			image,
 			options,
 		),
-		// TODO: Add the ports
-		RoleName:      options.RoleName,
-		ClusterName:   options.ClusterName,
-		ClusterConfig: clusterConfig,
+		RoleName:        options.RoleName,
+		ClusterName:     options.ClusterName,
+		ClusterConfig:   clusterConfig,
+		RoleGroupConfig: roleGroupConfig,
 	}
 }
 
@@ -101,7 +101,56 @@ func (b *DeploymentBuilder) Build(ctx context.Context) (ctrlclient.Object, error
 	b.AddContainer(b.getMainContainer(kerberosConfig, s3Config).Build())
 	b.AddVolumes(b.getVolumes(s3Config, kerberosConfig))
 
-	return b.GetObject()
+	obj, err := b.GetObject()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := b.setupVector(obj); err != nil {
+		return nil, err
+	}
+
+	return obj, nil
+}
+
+func (b *DeploymentBuilder) setupVector(obj *appv1.Deployment) error {
+	if b.RoleGroupConfig != nil && b.RoleGroupConfig.Logging != nil && b.RoleGroupConfig.Logging.EnableVectorAgent {
+		vector := builder.NewVectorDecorator(
+			obj,
+			b.GetImage(),
+			MatestoreLogVolumeName,
+			MatestoreConfigmapVolumeName,
+			b.Name,
+		)
+		if err := vector.Decorate(); err != nil {
+			return err
+		}
+		// hotfix vector /kubedoop/vector/var doesn't exist
+		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: "vector-var",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					SizeLimit: ptr.To(resource.MustParse("10Mi")),
+				},
+			},
+		})
+
+		containers := obj.Spec.Template.Spec.Containers
+		for i := range containers {
+			if containers[i].Name == builder.VectorContainerName {
+				containers[i].VolumeMounts = append(containers[i].VolumeMounts, corev1.VolumeMount{
+					Name:      "vector-var",
+					MountPath: "/kubedoop/vector/var",
+				})
+			}
+		}
+
+		obj.Spec.Template.Spec.Containers = containers
+
+		return nil
+	}
+
+	return nil
 }
 
 func (b *DeploymentBuilder) getMainContainer(krb5Config *KerberosConfig, s3Config *S3Config) *builder.Container {
@@ -133,6 +182,7 @@ func (b *DeploymentBuilder) getMainContainer(krb5Config *KerberosConfig, s3Confi
 			},
 			InitialDelaySeconds: 30,
 			PeriodSeconds:       10,
+			FailureThreshold:    5,
 		})
 
 	return container
@@ -260,10 +310,6 @@ func (b *DeploymentBuilder) getMainContainerEnv(krb5Config *KerberosConfig) []co
 	return env
 }
 
-// func (b *DeploymentBuilder) getVectorContainer() *builder.Container {
-// 	panic("not implemented")
-// }
-
 func (b *DeploymentBuilder) getVolumes(s3Config *S3Config, krb5Cofig *KerberosConfig) []corev1.Volume {
 	volumes := []corev1.Volume{
 		{
@@ -360,6 +406,7 @@ func NewDeploymentReconciler(
 		client,
 		roleGroupInfo.GetFullName(),
 		clusterConfig,
+		spec.Config,
 		&spec.Replicas,
 		image,
 		options,
