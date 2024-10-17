@@ -1,6 +1,6 @@
 apiVersion: v2
 name: hive-operator
-description: A Helm chart for Kubernetes
+description: The Kubedoop Operator for Apache Hive
 
 # A chart can be either an 'application' or a 'library' chart.
 #

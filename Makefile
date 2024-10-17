@@ -335,6 +335,33 @@ catalog-docker-buildx: ## Build and push a catalog image for cross-platform supp
 	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) -f catalog.Dockerfile --tag ${CATALOG_IMG} .
 	- $(CONTAINER_TOOL) buildx rm project-v3-builder
 
+##@ helm
+
+HELM_VERSION ?= v3.16.2
+HELM = $(LOCALBIN)/helm
+
+.PHONY: helm
+helm: ## Download helm locally if necessary.
+ifeq (,$(shell which $(HELM)))
+ifeq (,$(shell which helm 2>/dev/null))
+	@{ \
+	set -e ;\
+	mkdir -p $(dir $(HELM)) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSL https://get.helm.sh/helm-$(HELM_VERSION)-$${OS}-$${ARCH}.tar.gz | tar -xz -C $(LOCALBIN) --strip-components=1 $${OS}-$${ARCH}/helm ;\
+	chmod +x $(HELM) ;\
+	}
+else
+HELM = $(shell which helm)
+endif
+endif
+
+.PHONY: helm-chart
+helm-chart: helm kustomize ## Create a helm chart.
+	$(KUSTOMIZE) build config/crd > deploy/helm/$(PROJECT_NAME)/crds/crds.yaml
+	$(HELM) verify deploy/helm/$(PROJECT_NAME)
+
+
 ##@ E2E
 
 # kind
