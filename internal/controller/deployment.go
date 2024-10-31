@@ -385,7 +385,7 @@ func NewDeploymentReconciler(
 		},
 		// PodOverrides:     spec.PodOverrides,
 		EnvOverrides:     spec.EnvOverrides,
-		CommandOverrides: spec.CommandOverrides,
+		CommandOverrides: spec.CliOverrides,
 	}
 
 	if spec.Config != nil {

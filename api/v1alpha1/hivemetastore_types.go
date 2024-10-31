@@ -154,7 +154,7 @@ type RoleSpec struct {
 	PodDisruptionBudget *commonsv1alpha1.PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	CommandArgsOverrides []string `json:"commandArgsOverrides,omitempty"`
+	CliOverrides []string `json:"cliOverrides,omitempty"`
 
 	// - hdfs-site.xml
 	// - core-site.xml
@@ -199,7 +199,7 @@ type RoleGroupSpec struct {
 	Config *ConfigSpec `json:"config,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	CommandOverrides []string `json:"commandOverrides,omitempty"`
+	CliOverrides []string `json:"cliOverrides,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	ConfigOverrides map[string]string `json:"configOverrides,omitempty"`
