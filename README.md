@@ -20,6 +20,14 @@ It provides a set of pre-configured Operators to easily deploy and manage variou
 helm repo add kubedoop https://zncdatadev.github.io/kubedoop-helm-charts/
 ```
 
+### Add required dependencies
+
+```bash
+helm install commons-operator kubedoop/commons-operator
+helm install listener-operator kubedoop/listener-operator
+helm install secret-operator kubedoop/secret-operator
+```
+
 ### Add hive-operator
 
 ```bash
@@ -39,7 +47,7 @@ kubectl apply -f config/samples
 Kubedoop operators:
 
 - [Kubedoop Operator for Apache DolphinScheduler](https://github.com/zncdatadev/dolphinscheduler-operator)
-- [Kubedoop Operator for Apache Hadoop Hdfs](https://github.com/zncdatadev/hdfs-operator)
+- [Kubedoop Operator for Apache Hadoop HDFS](https://github.com/zncdatadev/hdfs-operator)
 - [Kubedoop Operator for Apache HBase](https://github.com/zncdatadev/hbase-operator)
 - [Kubedoop Operator for Apache Hive](https://github.com/zncdatadev/hive-operator)
 - [Kubedoop Operator for Apache Kafka](https://github.com/zncdatadev/kafka-operator)
