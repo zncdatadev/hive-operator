@@ -6,8 +6,8 @@ metadata:
    app: elasticsearch
 spec:
  containers:
-   - name: es7
-     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.7
+   - name: es
+     image: elasticsearch:8.15.3
      env:
        - name: discovery.type
          value: "single-node"
@@ -22,8 +22,8 @@ spec:
      ports:
        - containerPort: 9200
          name: http
-   - name: kibana7
-     image: docker.elastic.co/kibana/kibana:7.17.7
+   - name: kibana
+     image: kibana:8.15.3
      env:
        - name: ELASTICSEARCH_HOSTS
          value: "http://localhost:9200"

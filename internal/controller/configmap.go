@@ -9,6 +9,7 @@ import (
 	"github.com/zncdatadev/operator-go/pkg/config/xml"
 	"github.com/zncdatadev/operator-go/pkg/productlogging"
 	"github.com/zncdatadev/operator-go/pkg/reconciler"
+	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
@@ -32,19 +33,19 @@ func NewConfigMapBuilder(
 	name string,
 	clusterConfig *hivev1alpha1.ClusterConfigSpec,
 	roleGroupConfig *hivev1alpha1.ConfigSpec,
-	options builder.Options,
+	option builder.Option,
 ) *ConfigMapBuilder {
 
 	return &ConfigMapBuilder{
 		ConfigMapBuilder: *builder.NewConfigMapBuilder(
 			client,
 			name,
-			options.Labels,
-			options.Annotations,
+			option.Labels,
+			option.Annotations,
 		),
-		ClusterName:     options.ClusterName,
-		RoleName:        options.RoleName,
-		RolegroupName:   options.RoleGroupName,
+		ClusterName:     option.ClusterName,
+		RoleName:        option.RoleName,
+		RolegroupName:   option.RoleGroupName,
 		ClusterConfig:   clusterConfig,
 		RoleGroupConfig: roleGroupConfig,
 	}
@@ -71,7 +72,9 @@ func (b *ConfigMapBuilder) Build(ctx context.Context) (ctrlclient.Object, error)
 		return nil, err
 	}
 
-	b.addLog4j2()
+	if err := b.addLog4j2(); err != nil {
+		return nil, err
+	}
 
 	return b.GetObject(), nil
 }
@@ -153,19 +156,29 @@ func (b *ConfigMapBuilder) getLogConfig() *commonsv1alpha1.LoggingConfigSpec {
 	}
 }
 
-func (b *ConfigMapBuilder) addLog4j2() {
+func (b *ConfigMapBuilder) addLog4j2() error {
 	logConfig := b.getLogConfig()
-	log4j2 := productlogging.NewLog4j2ConfigGenerator(
+	logGenerator, err := productlogging.NewConfigGenerator(
 		logConfig,
 		b.RoleName,
-		"%d{ISO8601} %5p [%t] %c{2}: %m%n",
-		nil,
 		"hive.log4j2.xml",
-		"",
+		productlogging.LogTypeLog4j2,
+		func(cgo *productlogging.ConfigGeneratorOption) {
+			cgo.ConsoleHandlerFormatter = ptr.To("%d{ISO8601} %5p [%t] %c{2}: %m%n")
+		},
 	)
 
-	s := log4j2.Generate()
+	if err != nil {
+		return err
+	}
+
+	s, err := logGenerator.Content()
+	if err != nil {
+		return err
+	}
+
 	b.AddItem("metastore-log4j2.properties", s)
+	return nil
 }
 
 func NewConfigMapReconciler(
@@ -179,7 +192,7 @@ func NewConfigMapReconciler(
 		options.GetFullName(),
 		clusterConfig,
 		spec.Config,
-		builder.Options{
+		builder.Option{
 			ClusterName:   options.GetClusterName(),
 			RoleName:      options.GetRoleName(),
 			RoleGroupName: options.GetGroupName(),
