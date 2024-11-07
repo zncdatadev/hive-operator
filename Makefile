@@ -118,7 +118,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
-GOLANGCI_LINT_VERSION ?= v1.60.3
+GOLANGCI_LINT_VERSION ?= v1.61.0
 golangci-lint:
 	@[ -f $(GOLANGCI_LINT) ] || { \
 	set -e ;\
@@ -211,8 +211,8 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.4.2
-CONTROLLER_TOOLS_VERSION ?= v0.16.2
+KUSTOMIZE_VERSION ?= v5.5.0
+CONTROLLER_TOOLS_VERSION ?= v0.16.5
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
@@ -379,9 +379,9 @@ helm-uninstall: ## Uninstall the helm chart.
 	$(HELM) uninstall --namespace $(TEST_NAMESPACE) $(PROJECT_NAME)
 
 # kind
-KIND_VERSION ?= v0.23.0
+KIND_VERSION ?= v0.24.0
 
-KINDTEST_K8S_VERSION ?= 1.26.14
+KINDTEST_K8S_VERSION ?= 1.26.15
 
 KIND_IMAGE ?= kindest/node:v${KINDTEST_K8S_VERSION}
 
@@ -417,7 +417,7 @@ kind-delete: kind ## Delete a kind cluster.
 
 # chainsaw
 
-CHAINSAW_VERSION ?= v0.2.10
+CHAINSAW_VERSION ?= v0.2.11
 CHAINSAW = $(LOCALBIN)/chainsaw
 
 .PHONY: chainsaw
