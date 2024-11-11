@@ -48,6 +48,7 @@ type HiveMetastoreReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=s3.zncdata.dev,resources=s3connections,verbs=get;list;watch
 // +kubebuilder:rbac:groups=s3.zncdata.dev,resources=s3buckets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 
 func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log.Info("Reconciling instance")

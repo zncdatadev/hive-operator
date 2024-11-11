@@ -151,7 +151,7 @@ type RoleSpec struct {
 	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups"`
 
 	// +kubebuilder:validation:Optional
-	PodDisruptionBudget *commonsv1alpha1.PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
+	RoleConfig *commonsv1alpha1.RoleConfigSpec `json:"roleConfig,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	CliOverrides []string `json:"cliOverrides,omitempty"`
