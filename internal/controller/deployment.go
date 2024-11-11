@@ -125,28 +125,6 @@ func (b *DeploymentBuilder) setupVector(obj *appv1.Deployment) error {
 		if err := vector.Decorate(); err != nil {
 			return err
 		}
-		// hotfix vector /kubedoop/vector/var doesn't exist
-		obj.Spec.Template.Spec.Volumes = append(obj.Spec.Template.Spec.Volumes, corev1.Volume{
-			Name: "vector-var",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{
-					SizeLimit: ptr.To(resource.MustParse("10Mi")),
-				},
-			},
-		})
-
-		containers := obj.Spec.Template.Spec.Containers
-		for i := range containers {
-			if containers[i].Name == builder.VectorContainerName {
-				containers[i].VolumeMounts = append(containers[i].VolumeMounts, corev1.VolumeMount{
-					Name:      "vector-var",
-					MountPath: "/kubedoop/vector/var",
-				})
-			}
-		}
-
-		obj.Spec.Template.Spec.Containers = containers
-
 		return nil
 	}
 
@@ -376,7 +354,7 @@ func NewDeploymentReconciler(
 	spec *hivev1alpha1.RoleGroupSpec,
 ) (*reconciler.Deployment, error) {
 	options := builder.WorkloadOptions{
-		Options: builder.Options{
+		Option: builder.Option{
 			ClusterName:   roleGroupInfo.ClusterName,
 			RoleName:      roleGroupInfo.RoleName,
 			RoleGroupName: roleGroupInfo.RoleGroupName,
@@ -384,8 +362,8 @@ func NewDeploymentReconciler(
 			Annotations:   roleGroupInfo.GetAnnotations(),
 		},
 		// PodOverrides:     spec.PodOverrides,
-		EnvOverrides:     spec.EnvOverrides,
-		CommandOverrides: spec.CliOverrides,
+		EnvOverrides: spec.EnvOverrides,
+		CliOverrides: spec.CliOverrides,
 	}
 
 	if spec.Config != nil {
