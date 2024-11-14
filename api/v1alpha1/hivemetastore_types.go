@@ -50,7 +50,7 @@ type HiveMetastoreList struct {
 
 // HiveMetastoreSpec defines the desired state of HiveMetastore
 type HiveMetastoreSpec struct {
-	//+kubebuilder:validation:Optional
+	// +kubebuilder:validation:Optional
 	Image *ImageSpec `json:"image,omitempty"`
 
 	// +kubebuilder:validation:Required

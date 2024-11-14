@@ -142,10 +142,6 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-# olm
-bundle
-bundle.Dockerfile
-
 kind-kubeconfig*
 kind-config-local.yaml
 
@@ -157,11 +153,3 @@ cover.out
 
 # ai code local
 .codiumai.toml
-
-
-# bundle
-bundle.Dockerfile
-bundle
-
-catalog
-catalog.Dockerfile
