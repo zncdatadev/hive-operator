@@ -5,9 +5,6 @@
 domain: zncdata.dev
 layout:
 - go.kubebuilder.io/v4
-plugins:
-  manifests.sdk.operatorframework.io/v2: {}
-  scorecard.sdk.operatorframework.io/v2: {}
 projectName: hive-operator
 repo: github.com/zncdatadev/hive-operator
 resources:

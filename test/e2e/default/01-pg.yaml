@@ -8,8 +8,6 @@ type: Opaque
 stringData:
   POSTGRESQL_PASSWORD: hive
   POSTGRESQL_USERNAME: hive
-  POSTGRESQL_ADMIN_PASSWORD: postgres
-
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -27,14 +25,14 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: registry.access.redhat.com/rhel9/postgresql-16:1-25.1724037700
+          image: bitnami/postgresql:16.4.0
           ports:
             - containerPort: 5432
               name: tcp
           env:
           - name: POSTGRESQL_DATABASE
             value: superset
-          - name: POSTGRESQL_USER
+          - name: POSTGRESQL_USERNAME
             valueFrom:
               secretKeyRef:
                 name: postgres
@@ -44,11 +42,6 @@ spec:
               secretKeyRef:
                 name: postgres
                 key: POSTGRESQL_PASSWORD
-          - name: POSTGRESQL_ADMIN_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: postgres
-                key: POSTGRESQL_ADMIN_PASSWORD
           resources:
             requests:
               memory: "64Mi"
@@ -56,12 +49,6 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
-          readinessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - pg_isready -U $POSTGRESQL_USER -d $POSTGRESQL_DATABASE
 ---
 apiVersion: v1
 kind: Service
