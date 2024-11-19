@@ -39,15 +39,15 @@ type HiveMetastoreReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=zncdata.dev,resources=hivemetastores,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=zncdata.dev,resources=hivemetastores/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=zncdata.dev,resources=hivemetastores/finalizers,verbs=update
+// +kubebuilder:rbac:groups=kubedoop.dev,resources=hivemetastores,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kubedoop.dev,resources=hivemetastores/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=kubedoop.dev,resources=hivemetastores/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
-// +kubebuilder:rbac:groups=s3.zncdata.dev,resources=s3connections,verbs=get;list;watch
-// +kubebuilder:rbac:groups=s3.zncdata.dev,resources=s3buckets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=s3.kubedoop.dev,resources=s3connections,verbs=get;list;watch
+// +kubebuilder:rbac:groups=s3.kubedoop.dev,resources=s3buckets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 
 func (r *HiveMetastoreReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

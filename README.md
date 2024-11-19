@@ -64,7 +64,7 @@ Kubedoop built-in operators:
 
 ## Contributing
 
-If you'd like to contribute to Kubedoop, please refer to our [Contributing Guide](https://zncdata.dev/docs/developer-manual/collaboration) for more information.
+If you'd like to contribute to Kubedoop, please refer to our [Contributing Guide](https://kubedoop.dev/docs/developer-manual/collaboration) for more information.
 We welcome contributions of all kinds, including but not limited to code, documentation, and use cases.
 
 ## License

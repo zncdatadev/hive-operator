@@ -127,7 +127,7 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		WebhookServer:          webhookServer,
-		LeaderElectionID:       "d5bf9a68.zncdata.dev",
+		LeaderElectionID:       "d5bf9a68.kubedoop.dev",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
