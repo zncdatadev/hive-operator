@@ -38,27 +38,6 @@ rules:
   - update
   - watch
 - apiGroups:
-  - policy
-  resources:
-  - poddisruptionbudgets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - s3.kubedoop.dev
-  resources:
-  - s3buckets
-  - s3connections
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - kubedoop.dev
   resources:
   - hivemetastores
@@ -84,3 +63,24 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - s3.kubedoop.dev
+  resources:
+  - s3buckets
+  - s3connections
+  verbs:
+  - get
+  - list
+  - watch

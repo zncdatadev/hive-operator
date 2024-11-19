@@ -20,9 +20,6 @@ var _ builder.ConfigBuilder = &ConfigMapBuilder{}
 type ConfigMapBuilder struct {
 	builder.ConfigMapBuilder
 
-	ClusterName   string
-	RoleName      string
-	RolegroupName string
 	ClusterConfig *hivev1alpha1.ClusterConfigSpec
 
 	RoleGroupConfig *hivev1alpha1.ConfigSpec
@@ -33,19 +30,20 @@ func NewConfigMapBuilder(
 	name string,
 	clusterConfig *hivev1alpha1.ClusterConfigSpec,
 	roleGroupConfig *hivev1alpha1.ConfigSpec,
-	option builder.Option,
+	options ...builder.Option,
 ) *ConfigMapBuilder {
+	opts := builder.Options{}
+	for _, o := range options {
+		o(&opts)
+	}
 
 	return &ConfigMapBuilder{
 		ConfigMapBuilder: *builder.NewConfigMapBuilder(
 			client,
 			name,
-			option.Labels,
-			option.Annotations,
+			opts.Labels,
+			opts.Annotations,
 		),
-		ClusterName:     option.ClusterName,
-		RoleName:        option.RoleName,
-		RolegroupName:   option.RoleGroupName,
 		ClusterConfig:   clusterConfig,
 		RoleGroupConfig: roleGroupConfig,
 	}
@@ -80,14 +78,14 @@ func (b *ConfigMapBuilder) Build(ctx context.Context) (ctrlclient.Object, error)
 }
 
 func (b *ConfigMapBuilder) addVectorConfig(ctx context.Context) error {
-	if b.RoleGroupConfig != nil && b.RoleGroupConfig.Logging != nil && b.RoleGroupConfig.Logging.EnableVectorAgent {
+	if b.RoleGroupConfig != nil && b.RoleGroupConfig.Logging != nil && *b.RoleGroupConfig.Logging.EnableVectorAgent {
 		vectorConfig, err := productlogging.MakeVectorYaml(
 			ctx,
 			b.Client.Client,
 			b.Client.GetOwnerNamespace(),
 			b.ClusterName,
 			b.RoleName,
-			b.RolegroupName,
+			b.RoleGroupName,
 			b.ClusterConfig.VectorAggregatorConfigMapName,
 		)
 		if err != nil {
@@ -184,25 +182,19 @@ func (b *ConfigMapBuilder) addLog4j2() error {
 func NewConfigMapReconciler(
 	client *client.Client,
 	clusterConfig *hivev1alpha1.ClusterConfigSpec,
-	options reconciler.RoleGroupInfo,
-	spec hivev1alpha1.RoleGroupSpec,
+	info reconciler.RoleGroupInfo,
+	config *hivev1alpha1.ConfigSpec,
+	options ...builder.Option,
 ) *reconciler.GenericResourceReconciler[*ConfigMapBuilder] {
 	cmBuilder := NewConfigMapBuilder(
 		client,
-		options.GetFullName(),
+		info.GetFullName(),
 		clusterConfig,
-		spec.Config,
-		builder.Option{
-			ClusterName:   options.GetClusterName(),
-			RoleName:      options.GetRoleName(),
-			RoleGroupName: options.GetGroupName(),
-			Labels:        options.GetLabels(),
-			Annotations:   options.GetAnnotations(),
-		},
+		config,
+		options...,
 	)
 	return reconciler.NewGenericResourceReconciler[*ConfigMapBuilder](
 		client,
-		options.GetFullName(),
 		cmBuilder,
 	)
 }

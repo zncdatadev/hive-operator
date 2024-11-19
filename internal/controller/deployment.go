@@ -4,8 +4,8 @@ import (
 	"context"
 	"path"
 	"strings"
-	"time"
 
+	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
 	"github.com/zncdatadev/operator-go/pkg/builder"
 	client "github.com/zncdatadev/operator-go/pkg/client"
 	"github.com/zncdatadev/operator-go/pkg/constants"
@@ -48,33 +48,36 @@ var _ builder.DeploymentBuilder = &DeploymentBuilder{}
 
 type DeploymentBuilder struct {
 	builder.Deployment
-	ClusterName     string
-	RoleName        string
-	ClusterConfig   *hivev1alpha1.ClusterConfigSpec
-	RoleGroupConfig *hivev1alpha1.ConfigSpec
+	ClusterConfig *hivev1alpha1.ClusterConfigSpec
 }
 
 func NewDeploymentBuilder(
 	client *client.Client,
 	name string,
 	clusterConfig *hivev1alpha1.ClusterConfigSpec,
-	roleGroupConfig *hivev1alpha1.ConfigSpec,
 	replicas *int32,
 	image *util.Image,
-	options builder.WorkloadOptions,
+	overrides *commonsv1alpha1.OverridesSpec,
+	roleGroupConfig *commonsv1alpha1.RoleGroupConfigSpec,
+	options ...builder.Option,
 ) *DeploymentBuilder {
+
+	opts := builder.Options{}
+	for _, o := range options {
+		o(&opts)
+	}
+
 	return &DeploymentBuilder{
 		Deployment: *builder.NewDeployment(
 			client,
 			name,
 			replicas,
 			image,
-			options,
+			overrides,
+			roleGroupConfig,
+			options...,
 		),
-		RoleName:        options.RoleName,
-		ClusterName:     options.ClusterName,
-		ClusterConfig:   clusterConfig,
-		RoleGroupConfig: roleGroupConfig,
+		ClusterConfig: clusterConfig,
 	}
 }
 
@@ -114,7 +117,7 @@ func (b *DeploymentBuilder) Build(ctx context.Context) (ctrlclient.Object, error
 }
 
 func (b *DeploymentBuilder) setupVector(obj *appv1.Deployment) error {
-	if b.RoleGroupConfig != nil && b.RoleGroupConfig.Logging != nil && b.RoleGroupConfig.Logging.EnableVectorAgent {
+	if b.RoleGroupConfig != nil && b.RoleGroupConfig.Logging != nil && *b.RoleGroupConfig.Logging.EnableVectorAgent {
 		vector := builder.NewVectorDecorator(
 			obj,
 			b.GetImage(),
@@ -350,49 +353,26 @@ func NewDeploymentReconciler(
 	clusterConfig *hivev1alpha1.ClusterConfigSpec,
 	ports []corev1.ContainerPort,
 	image *util.Image,
+	replicas *int32,
 	stopped bool,
-	spec *hivev1alpha1.RoleGroupSpec,
+	overrides *commonsv1alpha1.OverridesSpec,
+	roleGroupConfig *commonsv1alpha1.RoleGroupConfigSpec,
+	options ...builder.Option,
 ) (*reconciler.Deployment, error) {
-	options := builder.WorkloadOptions{
-		Option: builder.Option{
-			ClusterName:   roleGroupInfo.ClusterName,
-			RoleName:      roleGroupInfo.RoleName,
-			RoleGroupName: roleGroupInfo.RoleGroupName,
-			Labels:        roleGroupInfo.GetLabels(),
-			Annotations:   roleGroupInfo.GetAnnotations(),
-		},
-		// PodOverrides:     spec.PodOverrides,
-		EnvOverrides: spec.EnvOverrides,
-		CliOverrides: spec.CliOverrides,
-	}
-
-	if spec.Config != nil {
-		if spec.Config.GracefulShutdownTimeout != nil {
-			if gracefulShutdownTimeout, err := time.ParseDuration(*spec.Config.GracefulShutdownTimeout); err != nil {
-				return nil, err
-			} else {
-				options.TerminationGracePeriod = &gracefulShutdownTimeout
-			}
-
-		}
-
-		options.Affinity = spec.Config.Affinity
-		options.Resource = spec.Config.Resources
-	}
 
 	b := NewDeploymentBuilder(
 		client,
 		roleGroupInfo.GetFullName(),
 		clusterConfig,
-		spec.Config,
-		&spec.Replicas,
+		replicas,
 		image,
-		options,
+		overrides,
+		roleGroupConfig,
+		options...,
 	)
 
 	return reconciler.NewDeployment(
 		client,
-		roleGroupInfo.GetFullName(),
 		b,
 		stopped,
 	), nil

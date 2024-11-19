@@ -11,7 +11,7 @@ stringData:
 apiVersion: kubedoop.dev/v1alpha1
 kind: HiveMetastore
 metadata:
-  name: hive-vector
+  name: hive-pdb
 spec:
   clusterConfig:
     database:
