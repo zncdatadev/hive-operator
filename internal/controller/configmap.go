@@ -41,8 +41,7 @@ func NewConfigMapBuilder(
 		ConfigMapBuilder: *builder.NewConfigMapBuilder(
 			client,
 			name,
-			opts.Labels,
-			opts.Annotations,
+			options...,
 		),
 		ClusterConfig:   clusterConfig,
 		RoleGroupConfig: roleGroupConfig,
@@ -91,7 +90,7 @@ func (b *ConfigMapBuilder) addVectorConfig(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		b.AddItem(builder.VectorConfigFile, vectorConfig)
+		b.AddItem(builder.VectorConfigFileName, vectorConfig)
 	}
 	return nil
 }

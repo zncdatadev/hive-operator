@@ -151,7 +151,7 @@ type RoleSpec struct {
 	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups"`
 
 	// +kubebuilder:validation:Optional
-	RoleConfigSpec *commonsv1alpha1.RoleConfigSpec `json:"roleConfig,omitempty"`
+	RoleConfig *commonsv1alpha1.RoleConfigSpec `json:"roleConfig,omitempty"`
 
 	*commonsv1alpha1.OverridesSpec `json:",inline"`
 }

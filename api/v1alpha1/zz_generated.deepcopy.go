@@ -354,8 +354,8 @@ func (in *RoleSpec) DeepCopyInto(out *RoleSpec) {
 			(*out)[key] = outVal
 		}
 	}
-	if in.RoleConfigSpec != nil {
-		in, out := &in.RoleConfigSpec, &out.RoleConfigSpec
+	if in.RoleConfig != nil {
+		in, out := &in.RoleConfig, &out.RoleConfig
 		*out = new(commonsv1alpha1.RoleConfigSpec)
 		(*in).DeepCopyInto(*out)
 	}
