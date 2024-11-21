@@ -19,7 +19,7 @@ package v1alpha1
 import (
 	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
 	s3v1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/zncdatadev/operator-go/pkg/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -77,7 +77,7 @@ type ClusterConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=cluster-internal
 	// +kubebuilder:validation:Enum=cluster-internal;external-unstable;external-stable
-	ListenerClass string `json:"listenerClass,omitempty"`
+	ListenerClass constants.ListenerClass `json:"listenerClass,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	HDFS *HDFSSpec `json:"hdfs,omitempty"`
@@ -153,41 +153,15 @@ type RoleSpec struct {
 	// +kubebuilder:validation:Optional
 	RoleConfig *commonsv1alpha1.RoleConfigSpec `json:"roleConfig,omitempty"`
 
-	// +kubebuilder:validation:Optional
-	CliOverrides []string `json:"cliOverrides,omitempty"`
-
-	// - hdfs-site.xml
-	// - core-site.xml
-	// +kubebuilder:validation:Optional
-	ConfigOverrides map[string]string `json:"configOverrides,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// PodOverride *corev1.PodTemplateSpec `json:"podOverride,omitempty"`
+	*commonsv1alpha1.OverridesSpec `json:",inline"`
 }
 
 type ConfigSpec struct {
-	// +kubebuilder:validation:Optional
-	Resources *commonsv1alpha1.ResourcesSpec `json:"resources,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Affinity *corev1.Affinity `json:"affinity"`
-
-	// +kubebuilder:validation:Optional
-	PodDisruptionBudget *commonsv1alpha1.PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
-
-	// Use time.ParseDuration to parse the string
-	// +kubebuilder:validation:Optional
-	GracefulShutdownTimeout *string `json:"gracefulShutdownTimeout,omitempty"`
+	*commonsv1alpha1.RoleGroupConfigSpec `json:",inline"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="/kubedoop/warehouse"
 	WarehouseDir string `json:"warehouseDir,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Logging *LoggingSpec `json:"logging,omitempty"`
 }
 
 type RoleGroupSpec struct {
@@ -198,17 +172,7 @@ type RoleGroupSpec struct {
 	// +kubebuilder:validation:Optional
 	Config *ConfigSpec `json:"config,omitempty"`
 
-	// +kubebuilder:validation:Optional
-	CliOverrides []string `json:"cliOverrides,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	ConfigOverrides map[string]string `json:"configOverrides,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// PodOverride *corev1.PodTemplateSpec `json:"podOverride,omitempty"`
+	*commonsv1alpha1.OverridesSpec `json:",inline"`
 }
 
 // HiveMetastoreStatus defines the observed state of HiveMetastore

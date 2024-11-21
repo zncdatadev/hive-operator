@@ -8,10 +8,10 @@ stringData:
   username: hive
   password: hive
 ---
-apiVersion: zncdata.dev/v1alpha1
+apiVersion: kubedoop.dev/v1alpha1
 kind: HiveMetastore
 metadata:
-  name: hive-vector
+  name: hive-pdb
 spec:
   clusterConfig:
     database:

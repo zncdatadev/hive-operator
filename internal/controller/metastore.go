@@ -3,9 +3,9 @@ package controller
 import (
 	"context"
 
+	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
 	"github.com/zncdatadev/operator-go/pkg/builder"
 	"github.com/zncdatadev/operator-go/pkg/client"
-	"github.com/zncdatadev/operator-go/pkg/constants"
 	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	"github.com/zncdatadev/operator-go/pkg/util"
 
@@ -42,16 +42,28 @@ func NewNodeRoleReconciler(
 
 func (r *RoleReconciler) RegisterResources(ctx context.Context) error {
 	for name, roleGroup := range r.Spec.RoleGroups {
-		mergedRolgGroup := roleGroup.DeepCopy()
-		r.MergeRoleGroupSpec(mergedRolgGroup)
-
 		info := reconciler.RoleGroupInfo{
 			RoleInfo:      r.RoleInfo,
 			RoleGroupName: name,
 		}
 
-		reconcilers, err := r.GetImageResourceWithRoleGroup(ctx, info, mergedRolgGroup)
+		mergedConfig, err := util.MergeObject(r.Spec.Config, roleGroup.Config)
+		if err != nil {
+			return err
+		}
 
+		mergedOverrides, err := util.MergeObject(r.Spec.OverridesSpec, roleGroup.OverridesSpec)
+		if err != nil {
+			return err
+		}
+
+		reconcilers, err := r.GetImageResourceWithRoleGroup(
+			ctx,
+			info,
+			mergedConfig,
+			mergedOverrides,
+			&roleGroup.Replicas,
+		)
 		if err != nil {
 			return err
 		}
@@ -63,14 +75,34 @@ func (r *RoleReconciler) RegisterResources(ctx context.Context) error {
 	return nil
 }
 
-func (r *RoleReconciler) GetImageResourceWithRoleGroup(ctx context.Context, info reconciler.RoleGroupInfo, spec *hivev1alpha1.RoleGroupSpec) ([]reconciler.Reconciler, error) {
+func (r *RoleReconciler) GetImageResourceWithRoleGroup(
+	ctx context.Context,
+	info reconciler.RoleGroupInfo,
+	config *hivev1alpha1.ConfigSpec,
+	overrides *commonsv1alpha1.OverridesSpec,
+	replicas *int32,
+) ([]reconciler.Reconciler, error) {
+
+	options := func(o *builder.Options) {
+		o.ClusterName = info.ClusterName
+		o.RoleName = info.RoleName
+		o.RoleGroupName = info.RoleGroupName
+		o.Labels = info.GetLabels()
+		o.Annotations = info.GetAnnotations()
+	}
 
 	cm := NewConfigMapReconciler(
 		r.Client,
 		r.ClusterConfig,
 		info,
-		*spec,
+		config,
+		options,
 	)
+
+	var commonsRoleGroupConfig *commonsv1alpha1.RoleGroupConfigSpec
+	if config != nil {
+		commonsRoleGroupConfig = config.RoleGroupConfigSpec
+	}
 
 	deployment, err := NewDeploymentReconciler(
 		r.Client,
@@ -78,8 +110,11 @@ func (r *RoleReconciler) GetImageResourceWithRoleGroup(ctx context.Context, info
 		r.ClusterConfig,
 		ContainerPort,
 		r.Image,
-		r.ClusterStopped,
-		spec,
+		replicas,
+		r.ClusterStopped(),
+		overrides,
+		commonsRoleGroupConfig,
+		options,
 	)
 	if err != nil {
 		return nil, err
@@ -89,13 +124,13 @@ func (r *RoleReconciler) GetImageResourceWithRoleGroup(ctx context.Context, info
 		r.Client,
 		info.GetFullName(),
 		ContainerPort,
-		func(sbo *builder.ServiceBuilderOption) {
-			sbo.Labels = info.GetLabels()
-			sbo.Annotations = info.GetAnnotations()
-			sbo.ClusterName = r.ClusterInfo.ClusterName
-			sbo.RoleName = r.RoleInfo.RoleName
-			sbo.RoleGroupName = info.RoleGroupName
-			sbo.ListenerClass = constants.ListenerClass(r.ClusterConfig.ListenerClass)
+		func(o *builder.ServiceBuilderOptions) {
+			o.ClusterName = info.ClusterName
+			o.RoleName = info.RoleName
+			o.RoleGroupName = info.RoleGroupName
+			o.Annotations = info.GetAnnotations()
+			o.Labels = info.GetLabels()
+
 		},
 	)
 	return []reconciler.Reconciler{cm, deployment, svc}, nil

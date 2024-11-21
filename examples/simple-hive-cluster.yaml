@@ -5,13 +5,13 @@ metadata:
   name: simple-hive-derby
 spec:
   image:
-    productVersion: 4.0.0
-    stackableVersion: 0.0.0-dev
+    productVersion: 3.1.1
+    kubedoopVersion: 0.0.0-dev
   clusterConfig:
     database:
-      connString: jdbc:derby:;databaseName=/tmp/hive;create=true
+      connectionString: jdbc:derby:;databaseName=/tmp/hive;create=true
       credentialsSecret: hive-credentials
-      dbType: derby
+      databaseType: derby
   metastore:
     roleGroups:
       default:

@@ -2,7 +2,7 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: zncdata.dev
+domain: kubedoop.dev
 layout:
 - go.kubebuilder.io/v4
 projectName: hive-operator
@@ -12,7 +12,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: zncdata.dev
+  domain: kubedoop.dev
   kind: HiveMetastore
   path: github.com/zncdatadev/hive-operator/api/v1alpha1
   version: v1alpha1

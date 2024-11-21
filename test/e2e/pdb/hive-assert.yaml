@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hive-vector-metastore-default
+  name: hive-pdb-metastore-default
 status:
   availableReplicas: 1
   readyReplicas: 1
@@ -10,17 +10,17 @@ status:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: hive-vector-metastore-default
+  name: hive-pdb-metastore-default
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: hive-vector-metastore-default
+  name: hive-pdb-metastore-default
 ---
 # pdb
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: hive-vector-metastore
+  name: hive-pdb-metastore
 spec:
   maxUnavailable: 2

@@ -139,6 +139,16 @@ github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/zncdatadev/operator-go v0.11.2 h1:/3ti+26D9w38gZV2eQLIz62mPe45em3Ej8iePoSj/04=
 github.com/zncdatadev/operator-go v0.11.2/go.mod h1:Thc0Jo5LuXnwrb73shfI63PKlxC+7cGq7SClzo3Y5qI=
+github.com/zncdatadev/operator-go v0.11.3-0.20241119024050-350d91b7a332 h1:KzD7yCE09cm7caFGk6/LWIJQ5rKNFWTxB7zESmmALpw=
+github.com/zncdatadev/operator-go v0.11.3-0.20241119024050-350d91b7a332/go.mod h1:9QGIaH5gTDgpv0kftcGkBGqCIj7cboC5ZMES9fZy4XI=
+github.com/zncdatadev/operator-go v0.11.3-0.20241120032430-105a1d2e2060 h1:2gdqCUJBUEJTQF6tnUZDO6bbyUbwl73fb6ad5Iuey7M=
+github.com/zncdatadev/operator-go v0.11.3-0.20241120032430-105a1d2e2060/go.mod h1:9QGIaH5gTDgpv0kftcGkBGqCIj7cboC5ZMES9fZy4XI=
+github.com/zncdatadev/operator-go v0.11.3-0.20241120055227-8133bdd0fd2f h1:vogJH3uptcKfk/5+1PFrSF0AfOQl5zU31haXMROa808=
+github.com/zncdatadev/operator-go v0.11.3-0.20241120055227-8133bdd0fd2f/go.mod h1:9QGIaH5gTDgpv0kftcGkBGqCIj7cboC5ZMES9fZy4XI=
+github.com/zncdatadev/operator-go v0.11.3-0.20241120070414-6959122bcbb4 h1:Yv9jB/MvkA9lTal5I8If2PQW7cOXctw2GyFmOC3II3Y=
+github.com/zncdatadev/operator-go v0.11.3-0.20241120070414-6959122bcbb4/go.mod h1:9QGIaH5gTDgpv0kftcGkBGqCIj7cboC5ZMES9fZy4XI=
+github.com/zncdatadev/operator-go v0.11.3-0.20241120074847-158caee1e00a h1:gbWkhuxGaWBbNMESJOMO7d0UMiljHpVNKq1LypjfClI=
+github.com/zncdatadev/operator-go v0.11.3-0.20241120074847-158caee1e00a/go.mod h1:9QGIaH5gTDgpv0kftcGkBGqCIj7cboC5ZMES9fZy4XI=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 h1:4K4tsIXefpVJtvA/8srF4V4y0akAoPHkIslgAkjixJA=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0/go.mod h1:jjdQuTGVsXV4vSs+CJ2qYDeDPf9yIJV23qlIzBm73Vg=
 go.opentelemetry.io/otel v1.28.0 h1:/SqNcYk+idO0CxKEUOtKQClMK/MimZihKYMruSMViUo=

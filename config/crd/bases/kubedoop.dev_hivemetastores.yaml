@@ -1,0 +1,632 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.5
+  name: hivemetastores.kubedoop.dev
+spec:
+  group: kubedoop.dev
+  names:
+    kind: HiveMetastore
+    listKind: HiveMetastoreList
+    plural: hivemetastores
+    singular: hivemetastore
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: HiveMetastore is the Schema for the hivemetastores API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HiveMetastoreSpec defines the desired state of HiveMetastore
+            properties:
+              clusterConfig:
+                properties:
+                  authentication:
+                    properties:
+                      kerberos:
+                        properties:
+                          secretClass:
+                            type: string
+                        required:
+                        - secretClass
+                        type: object
+                      tls:
+                        properties:
+                          jksPassword:
+                            default: changeit
+                            type: string
+                          secretClass:
+                            default: tls
+                            type: string
+                        type: object
+                    required:
+                    - kerberos
+                    type: object
+                  database:
+                    properties:
+                      connectionString:
+                        type: string
+                      credentialsSecret:
+                        description: |-
+                          A reference to a secret to use for the database connection credentials.
+                          It must contain the following keys:
+                           - username
+                           - password
+                        type: string
+                      databaseType:
+                        default: derby
+                        type: string
+                    required:
+                    - connectionString
+                    - credentialsSecret
+                    - databaseType
+                    type: object
+                  hdfs:
+                    properties:
+                      configMap:
+                        type: string
+                    required:
+                    - configMap
+                    type: object
+                  listenerClass:
+                    default: cluster-internal
+                    enum:
+                    - cluster-internal
+                    - external-unstable
+                    - external-stable
+                    type: string
+                  s3:
+                    properties:
+                      inline:
+                        description: S3ConnectionSpec defines the desired credential
+                          of S3Connection
+                        properties:
+                          credentials:
+                            description: |-
+                              Provides access credentials for S3Connection through SecretClass. SecretClass only needs to include:
+                               - ACCESS_KEY
+                               - SECRET_KEY
+                            properties:
+                              scope:
+                                description: SecretClass scope
+                                properties:
+                                  node:
+                                    type: boolean
+                                  pod:
+                                    type: boolean
+                                  services:
+                                    items:
+                                      type: string
+                                    type: array
+                                type: object
+                              secretClass:
+                                type: string
+                            required:
+                            - secretClass
+                            type: object
+                          host:
+                            type: string
+                          pathStyle:
+                            default: false
+                            type: boolean
+                          port:
+                            type: integer
+                          tls:
+                            properties:
+                              verification:
+                                description: |-
+                                  TLSPrivider defines the TLS provider for authentication.
+                                  You can specify the none or server or mutual verification.
+                                properties:
+                                  mutual:
+                                    properties:
+                                      certSecretClass:
+                                        type: string
+                                    required:
+                                    - certSecretClass
+                                    type: object
+                                  none:
+                                    type: object
+                                  server:
+                                    properties:
+                                      caCert:
+                                        description: |-
+                                          CACert is the CA certificate for server verification.
+                                          You can specify the secret class or the webPki.
+                                        properties:
+                                          secretClass:
+                                            type: string
+                                          webPki:
+                                            type: object
+                                        type: object
+                                    required:
+                                    - caCert
+                                    type: object
+                                type: object
+                            type: object
+                        required:
+                        - credentials
+                        - host
+                        type: object
+                      reference:
+                        description: S3 connection reference
+                        type: string
+                    type: object
+                  vectorAggregatorConfigMapName:
+                    type: string
+                required:
+                - database
+                type: object
+              clusterOperation:
+                description: ClusterOperationSpec defines the desired state of ClusterOperation
+                properties:
+                  reconciliationPaused:
+                    default: false
+                    type: boolean
+                  stopped:
+                    default: false
+                    type: boolean
+                type: object
+              image:
+                properties:
+                  custom:
+                    type: string
+                  kubedoopVersion:
+                    default: 0.0.0-dev
+                    type: string
+                  productVersion:
+                    default: 3.1.3
+                    type: string
+                  pullPolicy:
+                    default: IfNotPresent
+                    description: PullPolicy describes a policy for if/when to pull
+                      a container image
+                    enum:
+                    - Always
+                    - Never
+                    - IfNotPresent
+                    type: string
+                  pullSecretName:
+                    type: string
+                  repo:
+                    default: quay.io/zncdatadev
+                    type: string
+                type: object
+              metastore:
+                properties:
+                  cliOverrides:
+                    items:
+                      type: string
+                    type: array
+                  config:
+                    properties:
+                      affinity:
+                        type: object
+                        x-kubernetes-embedded-resource: true
+                        x-kubernetes-preserve-unknown-fields: true
+                      gracefulShutdownTimeout:
+                        default: 30s
+                        type: string
+                      logging:
+                        properties:
+                          containers:
+                            additionalProperties:
+                              properties:
+                                console:
+                                  description: |-
+                                    LogLevelSpec
+                                    level mapping if app log level is not standard
+                                      - FATAL -> CRITICAL
+                                      - ERROR -> ERROR
+                                      - WARN -> WARNING
+                                      - INFO -> INFO
+                                      - DEBUG -> DEBUG
+                                      - TRACE -> DEBUG
+
+                                    Default log level is INFO
+                                  properties:
+                                    level:
+                                      default: INFO
+                                      enum:
+                                      - FATAL
+                                      - ERROR
+                                      - WARN
+                                      - INFO
+                                      - DEBUG
+                                      - TRACE
+                                      type: string
+                                  type: object
+                                file:
+                                  description: |-
+                                    LogLevelSpec
+                                    level mapping if app log level is not standard
+                                      - FATAL -> CRITICAL
+                                      - ERROR -> ERROR
+                                      - WARN -> WARNING
+                                      - INFO -> INFO
+                                      - DEBUG -> DEBUG
+                                      - TRACE -> DEBUG
+
+                                    Default log level is INFO
+                                  properties:
+                                    level:
+                                      default: INFO
+                                      enum:
+                                      - FATAL
+                                      - ERROR
+                                      - WARN
+                                      - INFO
+                                      - DEBUG
+                                      - TRACE
+                                      type: string
+                                  type: object
+                                loggers:
+                                  additionalProperties:
+                                    description: |-
+                                      LogLevelSpec
+                                      level mapping if app log level is not standard
+                                        - FATAL -> CRITICAL
+                                        - ERROR -> ERROR
+                                        - WARN -> WARNING
+                                        - INFO -> INFO
+                                        - DEBUG -> DEBUG
+                                        - TRACE -> DEBUG
+
+                                      Default log level is INFO
+                                    properties:
+                                      level:
+                                        default: INFO
+                                        enum:
+                                        - FATAL
+                                        - ERROR
+                                        - WARN
+                                        - INFO
+                                        - DEBUG
+                                        - TRACE
+                                        type: string
+                                    type: object
+                                  type: object
+                              type: object
+                            type: object
+                          enableVectorAgent:
+                            type: boolean
+                        type: object
+                      resources:
+                        properties:
+                          cpu:
+                            properties:
+                              max:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              min:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                            type: object
+                          memory:
+                            properties:
+                              limit:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                            type: object
+                          storage:
+                            properties:
+                              capacity:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                default: 10Gi
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              storageClass:
+                                type: string
+                            type: object
+                        type: object
+                      warehouseDir:
+                        default: /kubedoop/warehouse
+                        type: string
+                    type: object
+                  configOverrides:
+                    additionalProperties:
+                      additionalProperties:
+                        type: string
+                      type: object
+                    type: object
+                  envOverrides:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  podOverrides:
+                    type: object
+                    x-kubernetes-embedded-resource: true
+                    x-kubernetes-preserve-unknown-fields: true
+                  roleConfig:
+                    properties:
+                      podDisruptionBudget:
+                        description: |-
+                          This struct is used to configure:
+                           1. If PodDisruptionBudgets are created by the operator
+                           2. The allowed number of Pods to be unavailable (`maxUnavailable`)
+                        properties:
+                          enabled:
+                            default: true
+                            description: |-
+                              Whether a PodDisruptionBudget should be written out for this role.
+                              Disabling this enables you to specify your own - custom - one.
+                              Defaults to true.
+                            type: boolean
+                          maxUnavailable:
+                            description: |-
+                              The number of Pods that are allowed to be down because of voluntary disruptions.
+                              If you don't explicitly set this, the operator will use a sane default based
+                              upon knowledge about the individual product.
+                            format: int32
+                            type: integer
+                        type: object
+                    type: object
+                  roleGroups:
+                    additionalProperties:
+                      properties:
+                        cliOverrides:
+                          items:
+                            type: string
+                          type: array
+                        config:
+                          properties:
+                            affinity:
+                              type: object
+                              x-kubernetes-embedded-resource: true
+                              x-kubernetes-preserve-unknown-fields: true
+                            gracefulShutdownTimeout:
+                              default: 30s
+                              type: string
+                            logging:
+                              properties:
+                                containers:
+                                  additionalProperties:
+                                    properties:
+                                      console:
+                                        description: |-
+                                          LogLevelSpec
+                                          level mapping if app log level is not standard
+                                            - FATAL -> CRITICAL
+                                            - ERROR -> ERROR
+                                            - WARN -> WARNING
+                                            - INFO -> INFO
+                                            - DEBUG -> DEBUG
+                                            - TRACE -> DEBUG
+
+                                          Default log level is INFO
+                                        properties:
+                                          level:
+                                            default: INFO
+                                            enum:
+                                            - FATAL
+                                            - ERROR
+                                            - WARN
+                                            - INFO
+                                            - DEBUG
+                                            - TRACE
+                                            type: string
+                                        type: object
+                                      file:
+                                        description: |-
+                                          LogLevelSpec
+                                          level mapping if app log level is not standard
+                                            - FATAL -> CRITICAL
+                                            - ERROR -> ERROR
+                                            - WARN -> WARNING
+                                            - INFO -> INFO
+                                            - DEBUG -> DEBUG
+                                            - TRACE -> DEBUG
+
+                                          Default log level is INFO
+                                        properties:
+                                          level:
+                                            default: INFO
+                                            enum:
+                                            - FATAL
+                                            - ERROR
+                                            - WARN
+                                            - INFO
+                                            - DEBUG
+                                            - TRACE
+                                            type: string
+                                        type: object
+                                      loggers:
+                                        additionalProperties:
+                                          description: |-
+                                            LogLevelSpec
+                                            level mapping if app log level is not standard
+                                              - FATAL -> CRITICAL
+                                              - ERROR -> ERROR
+                                              - WARN -> WARNING
+                                              - INFO -> INFO
+                                              - DEBUG -> DEBUG
+                                              - TRACE -> DEBUG
+
+                                            Default log level is INFO
+                                          properties:
+                                            level:
+                                              default: INFO
+                                              enum:
+                                              - FATAL
+                                              - ERROR
+                                              - WARN
+                                              - INFO
+                                              - DEBUG
+                                              - TRACE
+                                              type: string
+                                          type: object
+                                        type: object
+                                    type: object
+                                  type: object
+                                enableVectorAgent:
+                                  type: boolean
+                              type: object
+                            resources:
+                              properties:
+                                cpu:
+                                  properties:
+                                    max:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                    min:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                  type: object
+                                memory:
+                                  properties:
+                                    limit:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                  type: object
+                                storage:
+                                  properties:
+                                    capacity:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      default: 10Gi
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                    storageClass:
+                                      type: string
+                                  type: object
+                              type: object
+                            warehouseDir:
+                              default: /kubedoop/warehouse
+                              type: string
+                          type: object
+                        configOverrides:
+                          additionalProperties:
+                            additionalProperties:
+                              type: string
+                            type: object
+                          type: object
+                        envOverrides:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        podOverrides:
+                          type: object
+                          x-kubernetes-embedded-resource: true
+                          x-kubernetes-preserve-unknown-fields: true
+                        replicas:
+                          default: 1
+                          format: int32
+                          type: integer
+                      type: object
+                    type: object
+                required:
+                - roleGroups
+                type: object
+            required:
+            - clusterConfig
+            - metastore
+            type: object
+          status:
+            description: HiveMetastoreStatus defines the observed state of HiveMetastore
+            properties:
+              condition:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              replicas:
+                format: int32
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
