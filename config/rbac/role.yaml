@@ -38,7 +38,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - kubedoop.dev
+  - hive.kubedoop.dev
   resources:
   - hivemetastores
   verbs:
@@ -50,13 +50,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - kubedoop.dev
+  - hive.kubedoop.dev
   resources:
   - hivemetastores/finalizers
   verbs:
   - update
 - apiGroups:
-  - kubedoop.dev
+  - hive.kubedoop.dev
   resources:
   - hivemetastores/status
   verbs:

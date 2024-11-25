@@ -8,7 +8,7 @@ stringData:
   username: hive
   password: hive
 ---
-apiVersion: kubedoop.dev/v1alpha1
+apiVersion: hive.kubedoop.dev/v1alpha1
 kind: HiveMetastore
 metadata:
   name: hive-derby
