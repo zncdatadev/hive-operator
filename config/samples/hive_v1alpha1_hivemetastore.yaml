@@ -1,4 +1,4 @@
-apiVersion: kubedoop.dev/v1alpha1
+apiVersion: hive.kubedoop.dev/v1alpha1
 kind: HiveMetastore
 metadata:
   labels:

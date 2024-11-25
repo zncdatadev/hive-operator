@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
-  name: hivemetastores.kubedoop.dev
+  name: hivemetastores.hive.kubedoop.dev
 spec:
-  group: kubedoop.dev
+  group: hive.kubedoop.dev
   names:
     kind: HiveMetastore
     listKind: HiveMetastoreList
