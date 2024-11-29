@@ -1,0 +1,127 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+
+env:
+  VERSION: ${{ github.ref_name }}
+
+
+jobs:
+  markdown-lint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Run markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v18
+        with:
+          globs: |
+            README.*.md
+            docs/*.md
+
+
+  golang-lint:
+    name: golang-lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '~1.23'
+
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.61
+
+  golang-test:
+    name: Golang Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '~1.23'
+
+      - name: Running Tests
+        run: |
+          go mod tidy
+          make test
+
+
+  chainsaw-test:
+    name: Chainsaw Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        k8s-version: ['1.26.15', '1.27.16']
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '~1.23'
+
+      - name: Create KinD clustet pur
+        env:
+          KINDTEST_K8S_VERSION: ${{ matrix.k8s-version}}
+          KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+          KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        run: make kind-create
+
+      - name: Chainsaw test setup
+        env:
+          KINDTEST_K8S_VERSION: ${{ matrix.k8s-version }}
+          KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+          KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        run: make chainsaw-setup
+
+      - name: Test with Chainsaw
+        env:
+          KINDTEST_K8S_VERSION: ${{ matrix.k8s-version }}
+          KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+          KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        run: make chainsaw-test
+
+
+  release-image:
+    name: Release Image
+    if: ${{ github.repository_owner == 'zncdatadev' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Login to quay.io
+        uses: docker/login-action@v2
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+
+      - name: Build and push operator
+
+        run: |
+          make docker-buildx
