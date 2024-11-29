@@ -1,0 +1,64 @@
+
+name: Test
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+
+
+jobs:
+  golang-test:
+    name: Golang Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '~1.23'
+
+      - name: Running Tests
+        run: |
+          go mod tidy
+          make test
+
+
+  chainsaw-test:
+    name: Chainsaw Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        k8s-version: ['1.26.15', '1.27.16']
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '~1.23'
+
+      - name: Create KinD clustet pur
+        env:
+          KINDTEST_K8S_VERSION: ${{ matrix.k8s-version}}
+          KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+          KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        run: make kind-create
+
+      - name: Chainsaw test setup
+        env:
+          KINDTEST_K8S_VERSION: ${{ matrix.k8s-version }}
+          KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+          KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        run: make chainsaw-setup
+
+      - name: Test with Chainsaw
+        env:
+          KINDTEST_K8S_VERSION: ${{ matrix.k8s-version }}
+          KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+          KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        run: make chainsaw-test
