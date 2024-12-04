@@ -5,10 +5,11 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/zncdatadev/hive-operator)](https://goreportcard.com/report/github.com/zncdatadev/hive-operator)
 [![Artifact HUB](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/hive-operator)](https://artifacthub.io/packages/helm/kubedoop/hive-operator)
 
-This is a kubernetes operator to manage apache hive on kubernetes cluster. It's part of the kubedoop ecosystem.
+This is a Kubernetes operator to manage Apache Hive.
 
-Kubedoop is a cloud-native big data platform built on Kubernetes, designed to simplify the deployment and management of big data applications on Kubernetes.
-It provides a set of pre-configured Operators to easily deploy and manage various big data components such as HDFS, Hive, Spark, Kafka, and more.
+It's part of the kubedoop Data Platform, a modular open source data platform built on Kubernetes that provides Kubernetes native deployment
+and management of popular open source data apps like Apache Kafka, Apache Doris, Apache Kyuubi, Trino or Apache Spark, all working
+together seamlessly. Based on Kubernetes, it runs everywhere – on prem or in the cloud.
 
 ## Quick Start
 
@@ -40,23 +41,25 @@ helm install hive-operator kubedoop/hive-operator
 kubectl apply -f config/samples
 ```
 
-## Kubedoop Ecosystem
+## Kubedoop Data Platform Operators
 
-### Operators
+These are the operators that are currently part of the Kubedoop Data Platform:
 
-Kubedoop operators:
-
+- [Kubedoop Operator for Apache Airflow](https://github.com/zncdatadev/airflow-operator)
 - [Kubedoop Operator for Apache DolphinScheduler](https://github.com/zncdatadev/dolphinscheduler-operator)
+- [Kubedoop Operator for Apache Doris](https://github.com/zncdatadev/doris-operator)
 - [Kubedoop Operator for Apache Hadoop HDFS](https://github.com/zncdatadev/hdfs-operator)
 - [Kubedoop Operator for Apache HBase](https://github.com/zncdatadev/hbase-operator)
 - [Kubedoop Operator for Apache Hive](https://github.com/zncdatadev/hive-operator)
 - [Kubedoop Operator for Apache Kafka](https://github.com/zncdatadev/kafka-operator)
+- [Kubedoop Operator for Apache Kyuubi](https://github.com/zncdatadev/kyuubi-operator)
+- [Kubedoop Operator for Apache Nifi](https://github.com/zncdatadev/nifi-operator)
 - [Kubedoop Operator for Apache Spark](https://github.com/zncdatadev/spark-k8s-operator)
 - [Kubedoop Operator for Apache Superset](https://github.com/zncdatadev/superset-operator)
 - [Kubedoop Operator for Trino](https://github.com/zncdatadev/trino-operator)
 - [Kubedoop Operator for Apache Zookeeper](https://github.com/zncdatadev/zookeeper-operator)
 
-Kubedoop built-in operators:
+And our internal operators: :
 
 - [Commons Operator](https://github.com/zncdatadev/commons-operator)
 - [Listener Operator](https://github.com/zncdatadev/listener-operator)
