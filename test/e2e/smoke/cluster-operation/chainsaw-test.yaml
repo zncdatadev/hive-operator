@@ -1,0 +1,72 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: smoke-cluster-operation
+spec:
+  bindings:
+    - name: hive_version
+      value: ($values.product_version) # 3.1.0
+    - name: cluster_stopped
+      value: false
+    - name: cluster_paused
+      value: false
+  steps:
+  - name: install hive metastore
+    try:
+    # install hive metastore, clusterOperation.stopped: false, clusterOperation.reconciliationPaused: false
+    - apply:
+        file: hive.yaml
+    - assert:
+        bindings:
+          - name: available_replicas
+            value: 1
+        file: hive-assert.yaml
+  - name: stop hive-metastore cluster
+    try:
+    - apply:
+        bindings:
+          - name: cluster_stopped
+            value: true
+        file: hive.yaml
+    - assert:
+        resource: # TODO: refactor the hive kind to statefulset
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: test-hive-metastore-default
+          status:
+            conditions:
+              - reason: MinimumReplicasAvailable
+                type: Available
+                status: "True"
+              - reason: NewReplicaSetAvailable
+                type: Progressing
+                status: "True"
+            observedGeneration: 2
+    # pause hive-metastore cluster, clusterOperation.reconciliationPaused: true
+  - name: pause hive-metastore cluster
+    try:
+    - apply:
+        bindings:
+          - name: cluster_paused
+            value: true
+          - name: cluster_stopped
+            value: false
+        file: hive.yaml
+    - assert:
+        resource:
+          apiVersion: apps/v1
+          kind: Deployment
+    # restart hive-metastore cluster, clusterOperation.stopped: false, clusterOperation.reconciliationPaused: false
+  - name: restart hive-metastore cluster
+    try:
+    - apply:
+        file: hive.yaml
+    - assert:
+        bindings:
+          - name: available_replicas
+            value: 1
+        file: hive-assert.yaml
+    cleanup:
+    - sleep:
+        duration: 30s

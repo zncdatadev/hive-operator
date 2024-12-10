@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-zk-server-primary
+spec:
+  template:
+    spec:
+      containers:
+        - name: server
+status:
+  availableReplicas: ($available_replicas)
+  replicas: 1

@@ -42,8 +42,8 @@ func NewKerberosConfig(
 func (c *KerberosConfig) GetHiveSite() map[string]string {
 	return map[string]string{
 		"hive.metastore.sasl.enabled":              "true",
-		"hive.metastore.kerberos.principal":        c.getPrincipal("hive"),
-		"hive.metastore.client.kerberos.principal": c.getPrincipal("hive"),
+		"hive.metastore.kerberos.principal":        c.getPrincipal(c.RoleName),
+		"hive.metastore.client.kerberos.principal": c.getPrincipal(c.RoleName),
 		"hive.metastore.kerberos.keytab.file":      path.Join(constants.KubedoopKerberosDir, "keytab"),
 	}
 }

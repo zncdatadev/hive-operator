@@ -1,0 +1,83 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: kerberos-s3
+spec:
+  bindings:
+  - name: relam
+    value: KUBEDOOP.DEV   # kerberos relam, should be uppercase, see hdfs also
+  - name: kadminPassword
+    value: kubedoopdev
+  - name: kadminKeytabSecret
+    value: kadmin-keytab
+  steps:
+  - name: install krb5 kdc
+    try:
+    - apply:  # create a krb5 deployment and service, both named "krb5"
+        file: ../setup/krb5-install.yaml
+    - assert:
+        file: ../setup/krb5-assert.yaml
+    - script:
+        env:
+        - name: RELAM
+          value: ($relam)
+        - name: NAMESPACE
+          value: ($namespace)
+        - name: DEPLOYMENT_NAME
+          value: krb5
+        - name: KADMIN_KEYTAB_SECRET
+          value: ($kadminKeytabSecret)
+        content: |
+          # debug node info
+          kubectl get node
+          # get pod of deploment by label
+          POD_NAME=$(kubectl get pod -n $NAMESPACE -l app=$DEPLOYMENT_NAME -o jsonpath="{.items[0].metadata.name}")
+
+          # check pod exist
+          if [ -z "$POD_NAME" ]; then
+            echo "pod not found"
+            exit 1
+          fi
+
+          # get kadmin keytab
+          KADMIN_KEYTAB=$(kubectl exec -n $NAMESPACE $POD_NAME -- sh -c "cat /var/kerberos/krb5kdc/kadmin.keytab | base64 -w 0")
+
+          # create secret, name is $KADMIN_KEYTAB_SECRET
+          cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: $KADMIN_KEYTAB_SECRET
+            namespace: $NAMESPACE
+          data:
+            keytab: $KADMIN_KEYTAB
+    - assert: # assert kadmin keytab secret
+        resource:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: ($kadminKeytabSecret)
+          data:
+            (keytab != ""): true
+    - apply:
+        file: ../setup/krb5-secretclass.yaml
+  - name: install minio
+    try:
+    - apply:
+        file: ../setup/minio-secret.yaml
+    - script:
+        env:
+        - name: NAMESPACE
+          value: ($namespace)
+        content: |
+          bash ../setup/minio-install.sh
+  - name: install hive
+    try:
+    - apply:
+        file: ../setup/minio-s3-connection.yaml
+    - apply:
+        file: hive.yaml
+    - assert:
+        file: hive-assert.yaml
+  - name: access hive with kerberos,s3
+    description: todo...

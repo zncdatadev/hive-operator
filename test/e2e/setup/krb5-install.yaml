@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: krb5
+spec:
+  selector:
+    matchLabels:
+      app: krb5
+  template:
+    metadata:
+      labels:
+        app: krb5
+    spec:
+      containers:
+      - name: krb5
+        image: quay.io/zncdatadev-test/krb5:dev
+        args:
+          - -r
+          - ($relam)  # chainsaw bindings value
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+              - SYS_ADMIN
+        ports:
+          - containerPort: 88
+            protocol: TCP
+            name: kdc
+          - containerPort: 88
+            protocol: UDP
+            name: kdc-udp
+          - containerPort: 464
+            protocol: TCP
+            name: kpasswd
+          - containerPort: 464
+            protocol: UDP
+            name: kpasswd-udp
+          - containerPort: 749
+            protocol: TCP
+            name: kadmin
+        volumeMounts:
+          - name: tmp
+            mountPath: /tmp
+          - name: tmp
+            mountPath: /run
+          - name: tmp
+            mountPath: /run/lock
+            subPath: run-lock
+          - name: tmp
+            mountPath: /data
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "300m"
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - test -f /var/kerberos/krb5kdc/kadmin.keytab
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: krb5
+spec:
+  selector:
+    app: krb5
+  ports:
+    - protocol: TCP
+      port: 88
+      targetPort: 88
+      name: kdc
+    - protocol: UDP
+      port: 88
+      targetPort: 88
+      name: kdc-udp
+    - protocol: TCP
+      port: 464
+      targetPort: 464
+      name: kpasswd
+    - protocol: UDP
+      port: 464
+      targetPort: 464
+      name: kpasswd-udp
+    - protocol: TCP
+      port: 749
+      targetPort: 749
+      name: kadmin

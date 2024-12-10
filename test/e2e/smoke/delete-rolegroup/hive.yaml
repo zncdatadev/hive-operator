@@ -1,0 +1,18 @@
+apiVersion: zookeeper.kubedoop.dev/v1alpha1
+kind: ZookeeperCluster
+metadata:
+  name: test-hive
+spec:
+  image:
+    productVersion: ($values.product_version)
+  clusterConfig:
+    listenerClass: cluster-internal
+  server:
+    roleConfig:
+      podDisruptionBudget:
+        maxUnavailable: 1
+    roleGroups:
+      primary:
+        replicas: 1
+      secondary:
+        replicas: 1

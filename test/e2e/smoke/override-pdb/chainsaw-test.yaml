@@ -1,0 +1,57 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: smoke-override-pdb
+spec:
+  steps:
+  - name: install hive
+    try:
+    # install hive
+    - apply:
+        file: hive.yaml
+    - assert:
+        file: hive-assert.yaml
+  - name: test pdb
+    try:
+      - assert:
+          timeout: 240s
+          resource:
+            kind: PodDisruptionBudget
+            apiVersion: policy/v1
+            metadata:
+              name: test-hive-metastore
+              namespace: ($namespace)
+            spec:
+              maxUnavailable: 1
+            status:
+              expectedPods: 2
+              currentHealthy: 2
+              disruptionsAllowed: 1
+  - name: test env overrides
+    try:
+      - script:
+          bindings:
+            - name: NAMESPACE
+              value: ($namespace)
+          content: |
+            #!/bin/bash
+            kubectl -n $NAMESPACE get deployment test-hive-metastore-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "metastore") | .env[] | select (.name == "COMMON_VAR" and .value == "group-value")'
+            kubectl -n $NAMESPACE get deployment test-hive-metastore-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "metastore") | .env[] | select (.name == "GROUP_VAR" and .value == "group-value")'
+            kubectl -n $NAMESPACE get deployment test-hive-metastore-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "metastore") | .env[] | select (.name == "ROLE_VAR" and .value == "role-value")'
+  - name: test config overrides
+    description: todo Test config overrides (bug),
+    # try:
+      # - script:
+
+      #     bindings:
+      #       - name: NAMESPACE
+      #         value: ($namespace)
+      #     content: |
+      #       #!/bin/bash
+      #       # Check prop.common value
+      #       kubectl -n $NAMESPACE get cm test-hive-metastore-default -o yaml | yq -e '.data."zoo.cfg"' | grep -q "^prop.common=group$"
+
+      #       # Check prop.role value
+      #       kubectl -n $NAMESPACE get cm test-hive-metastore-default -o yaml | yq -e '.data."zoo.cfg"' | grep -q "^prop.role=group$"
+  - name: access metastore
+    description: todo Access the metastore

@@ -1,0 +1,32 @@
+apiVersion: s3.kubedoop.dev/v1alpha1
+kind: S3Connection
+metadata:
+  name: minio
+  namespace: ($namespace)
+spec:
+  host: minio
+  port: 9000
+  credentials:
+    secretClass: test-hive-s3-secret-class
+---
+apiVersion: secrets.kubedoop.dev/v1alpha1
+kind: SecretClass
+metadata:
+  name: test-hive-s3-secret-class
+  namespace: ($namespace)
+spec:
+  backend:
+    k8sSearch:
+      searchNamespace:
+        pod: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-hive-s3-secret
+  namespace: ($namespace)
+  labels:
+    secrets.kubedoop.dev/class: test-hive-s3-secret-class
+stringData:
+  accessKey: hive
+  secretKey: hivehive

@@ -1,23 +1,15 @@
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: hive
-type: Opaque
-stringData:
-  username: hive
-  password: hive
----
 apiVersion: hive.kubedoop.dev/v1alpha1
 kind: HiveMetastore
 metadata:
-  name: hive-vector
+  name: test-hive
 spec:
+  image:
+    productVersion: ($values.product_version)
   clusterConfig:
     database:
-      databaseType: derby
-      connectionString: jdbc:derby:;databaseName=metastore_db;create=true
-      credentialsSecret: hive
+      databaseType: postgres
+      connectionString: jdbc:postgresql://hive-postgresql:5432/hive
+      credentialsSecret: hive-credentials
     vectorAggregatorConfigMapName: vector-aggregator-discovery
   metastore:
     roleGroups:
@@ -27,3 +19,12 @@ spec:
           logging:
             enableVectorAgent: true
         replicas: 1
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hive-credentials
+type: Opaque
+stringData:
+  username: hive
+  password: hive

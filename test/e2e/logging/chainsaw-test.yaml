@@ -1,0 +1,58 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: logging
+spec:
+  steps:
+  - name: install vector-aggregator
+    try:
+    - script:
+        content: >-
+          helm install vector-aggregator vector
+          --namespace $NAMESPACE
+          --version 0.36.1
+          --repo https://helm.vector.dev
+          --values vector-aggregator-values.yaml
+    - apply:
+        file: vector-aggregator.yaml
+    - assert:
+        file: vector-aggregator-assert.yaml
+  - name: install postgressql
+    try:
+    - script:
+        env:
+          - name: NAMESPACE
+            value: ($namespace)
+        content: >-
+          bash  ../setup/postgres-install.sh
+    - assert:
+        file: ../setup/postgres-assert.yaml
+  - name: install hive
+    try:
+    - apply:
+        file: hive.yaml
+    - assert:
+        file: hive-assert.yaml
+  - name: assert hive logs
+    try:
+    - script:
+        env:
+          - name: NAMESPACE
+            value: ($namespace)
+        content: |
+          #!/bin/bash
+          # Get logs from vector-aggregator-0 and check for specific log pattern
+          kubectl -n $NAMESPACE logs statefulset/vector-aggregator -c vector | \
+            grep -q 'cluster":"test-hive","container":"metastore","errors":\[\],"file":"hive.log4j2.xml"'
+          exit_code=$?
+
+          if [ $exit_code -eq 0 ]; then
+            echo "Found expected log pattern"
+            exit 0
+          else
+            echo "Did not find expected log pattern"
+            exit 1
+          fi
+    cleanup:
+    - sleep:
+        duration: 50s

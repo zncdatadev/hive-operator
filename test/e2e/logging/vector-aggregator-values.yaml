@@ -1,0 +1,16 @@
+api:
+  enabled: true
+log_schema:
+  host_key: "pod"
+sinks:
+  debug_console:
+    type: "console"
+    inputs:
+      - vector
+    encoding:
+      codec: "json"
+sources:
+  vector:
+    address: 0.0.0.0:6000
+    type: vector
+    version: "2"
