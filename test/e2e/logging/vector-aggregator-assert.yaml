@@ -1,0 +1,15 @@
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vector-aggregator
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: v1
+data:
+  ADDRESS: "vector-aggregator:6000"
+kind: ConfigMap
+metadata:
+  name: vector-aggregator-discovery
