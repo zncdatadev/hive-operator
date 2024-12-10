@@ -1,0 +1,8 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-hive-metastore-default
+status:
+  availableReplicas: 2
+  readyReplicas: 2
+  replicas: 2
