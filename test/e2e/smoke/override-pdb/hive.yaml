@@ -1,0 +1,43 @@
+apiVersion: hive.kubedoop.dev/v1alpha1
+kind: HiveMetastore
+metadata:
+  name: test-hive
+spec:
+  image:
+    productVersion: ($values.product_version)
+  clusterConfig:
+    database:
+      databaseType: derby
+      connectionString: jdbc:derby:;databaseName=metastore_db;create=true
+      credentialsSecret: hive-credentials
+  metastore:
+    roleConfig:
+      podDisruptionBudget:
+        enabled: true
+        maxUnavailable: 1
+    envOverrides:
+      COMMON_VAR: role-value # overridden by role group below
+      ROLE_VAR: role-value   # only defined here at role level
+    configOverrides:
+      hive-site.xml:
+        COMMON_VAR: role-value # overridden by role group below
+        ROLE_VAR: role-value   # only defined here at role level
+    roleGroups:
+      default:
+        replicas: 2
+        envOverrides:
+          COMMON_VAR: group-value # overrides role value
+          GROUP_VAR: group-value # only defined here at group level
+        configOverrides:
+          hive-site.xml:
+            COMMON_VAR: group-value # overridden by role group below
+            GROUP_VAR: group-value # only defined here at group level
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hive-credentials
+type: Opaque
+stringData:
+  username: hive
+  password: hive

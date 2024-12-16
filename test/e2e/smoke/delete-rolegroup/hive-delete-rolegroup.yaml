@@ -1,0 +1,15 @@
+---
+apiVersion: zookeeper.kubedoop.dev/v1alpha1
+kind: ZookeeperCluster
+metadata:
+  name: test-zk
+spec:
+  image:
+    productVersion: ($values.product_version)
+  clusterConfig:
+    listenerClass: cluster-internal
+  server:
+    roleGroups:
+      primary:
+        replicas: 1
+      # secondary:
