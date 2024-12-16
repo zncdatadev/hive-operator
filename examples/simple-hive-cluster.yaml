@@ -1,11 +1,11 @@
 ---
 apiVersion: hive.kubedoop.dev/v1alpha1
-kind: HiveCluster
+kind: HiveMetastore
 metadata:
   name: simple-hive-derby
 spec:
   image:
-    productVersion: 3.1.1
+    productVersion: 4.0.1
     kubedoopVersion: 0.0.0-dev
   clusterConfig:
     database:

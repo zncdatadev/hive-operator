@@ -3,8 +3,6 @@ name: Test
 
 on:
   push:
-    branches:
-      - "main"
   pull_request:
 
 
@@ -33,7 +31,7 @@ jobs:
     strategy:
       matrix:
         k8s-version: ['1.26.15', '1.27.16']
-        product-version: ['3.1.3']
+        product-version: ['4.0.0']
       max-parallel: 2
     steps:
       - name: Clone the code
@@ -49,6 +47,7 @@ jobs:
           KINDTEST_K8S_VERSION: ${{ matrix.k8s-version}}
           KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
           KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+          PRODUCT_VERSION: ${{ matrix.product-version }}
         run: make kind-create
 
       - name: Chainsaw test setup
@@ -56,6 +55,7 @@ jobs:
           KINDTEST_K8S_VERSION: ${{ matrix.k8s-version }}
           KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
           KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+          PRODUCT_VERSION: ${{ matrix.product-version }}
         run: make chainsaw-setup
 
       - name: Test with Chainsaw
@@ -63,4 +63,5 @@ jobs:
           KINDTEST_K8S_VERSION: ${{ matrix.k8s-version }}
           KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
           KIND_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+          PRODUCT_VERSION: ${{ matrix.product-version }}
         run: make chainsaw-test
