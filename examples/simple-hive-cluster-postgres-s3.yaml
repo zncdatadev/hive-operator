@@ -12,12 +12,12 @@
 # --set postgresqlDatabase=hive
 ---
 apiVersion: hive.kubedoop.dev/v1alpha1
-kind: HiveCluster
+kind: HiveMetastore
 metadata:
   name: simple-hive-postgres
 spec:
   image:
-    productVersion: 4.0.0
+    productVersion: 4.0.1
     stackableVersion: 0.0.0-dev
   clusterConfig:
     database:

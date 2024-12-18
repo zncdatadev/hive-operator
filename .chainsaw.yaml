@@ -10,6 +10,7 @@ spec:
     cleanup: 240s
     delete: 240s
     error: 10s
-    exec: 45s
+    exec: 120s
   # skipDelete: true
   failFast: true
+  parallel: 1
