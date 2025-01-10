@@ -10,6 +10,7 @@ spec:
 status:
   availableReplicas: ($available_replicas)
   replicas: 1
+  currentReplicas: ($available_replicas)
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -23,3 +24,4 @@ spec:
 status:
   availableReplicas: ($available_replicas)
   replicas: 1
+  currentReplicas: ($available_replicas)

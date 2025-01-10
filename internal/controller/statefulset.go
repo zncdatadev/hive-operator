@@ -11,7 +11,6 @@ import (
 	"github.com/zncdatadev/operator-go/pkg/constants"
 	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	"github.com/zncdatadev/operator-go/pkg/util"
-	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -44,14 +43,14 @@ type DeploymentBUilderOption struct {
 	Annotations   map[string]string
 }
 
-var _ builder.DeploymentBuilder = &DeploymentBuilder{}
+var _ builder.StatefulSetBuilder = &StatefulSetBuilder{}
 
-type DeploymentBuilder struct {
-	builder.Deployment
+type StatefulSetBuilder struct {
+	builder.StatefulSet
 	ClusterConfig *hivev1alpha1.ClusterConfigSpec
 }
 
-func NewDeploymentBuilder(
+func NewStatefulSetBuilder(
 	client *client.Client,
 	name string,
 	clusterConfig *hivev1alpha1.ClusterConfigSpec,
@@ -60,15 +59,15 @@ func NewDeploymentBuilder(
 	overrides *commonsv1alpha1.OverridesSpec,
 	roleGroupConfig *commonsv1alpha1.RoleGroupConfigSpec,
 	options ...builder.Option,
-) *DeploymentBuilder {
+) *StatefulSetBuilder {
 
 	opts := builder.Options{}
 	for _, o := range options {
 		o(&opts)
 	}
 
-	return &DeploymentBuilder{
-		Deployment: *builder.NewDeployment(
+	return &StatefulSetBuilder{
+		StatefulSet: *builder.NewStatefulSetBuilder(
 			client,
 			name,
 			replicas,
@@ -81,7 +80,7 @@ func NewDeploymentBuilder(
 	}
 }
 
-func (b *DeploymentBuilder) Build(ctx context.Context) (ctrlclient.Object, error) {
+func (b *StatefulSetBuilder) Build(ctx context.Context) (ctrlclient.Object, error) {
 	var s3Config *S3Config
 	if b.ClusterConfig.S3 != nil {
 		s3Connection, err := GetS3Connect(ctx, b.Client, b.ClusterConfig.S3)
@@ -116,7 +115,7 @@ func (b *DeploymentBuilder) Build(ctx context.Context) (ctrlclient.Object, error
 	return obj, nil
 }
 
-func (b *DeploymentBuilder) setupVector(obj *appv1.Deployment) error {
+func (b *StatefulSetBuilder) setupVector(obj ctrlclient.Object) error {
 	if b.RoleGroupConfig != nil && b.RoleGroupConfig.Logging != nil && *b.RoleGroupConfig.Logging.EnableVectorAgent {
 		vector := builder.NewVectorDecorator(
 			obj,
@@ -134,7 +133,7 @@ func (b *DeploymentBuilder) setupVector(obj *appv1.Deployment) error {
 	return nil
 }
 
-func (b *DeploymentBuilder) getMainContainer(krb5Config *KerberosConfig, s3Config *S3Config) *builder.Container {
+func (b *StatefulSetBuilder) getMainContainer(krb5Config *KerberosConfig, s3Config *S3Config) *builder.Container {
 	container := builder.NewContainer(
 		b.RoleName,
 		b.GetImage(),
@@ -169,7 +168,7 @@ func (b *DeploymentBuilder) getMainContainer(krb5Config *KerberosConfig, s3Confi
 	return container
 }
 
-func (b *DeploymentBuilder) getMainContainerCommandArgs(krb5Config *KerberosConfig, S3Config *S3Config) []string {
+func (b *StatefulSetBuilder) getMainContainerCommandArgs(krb5Config *KerberosConfig, S3Config *S3Config) []string {
 	shutdownFile := path.Join(constants.KubedoopLogDir, "_vector", "shutdown")
 	args := []string{
 		`
@@ -202,7 +201,7 @@ bin/start-metastore --config `+constants.KubedoopConfigDir+` --db-type $DB_TYPE 
 	return []string{strings.Join(args, "\n")}
 }
 
-func (b *DeploymentBuilder) getJVMOpts(
+func (b *StatefulSetBuilder) getJVMOpts(
 	envs []corev1.EnvVar,
 ) corev1.EnvVar {
 	jvmOpt := []string{
@@ -221,7 +220,7 @@ func (b *DeploymentBuilder) getJVMOpts(
 	}
 }
 
-func (b *DeploymentBuilder) getMainContainerEnv(krb5Config *KerberosConfig) []corev1.EnvVar {
+func (b *StatefulSetBuilder) getMainContainerEnv(krb5Config *KerberosConfig) []corev1.EnvVar {
 
 	jvmOpts := []string{}
 	// database is required in ClusterConfig
@@ -291,7 +290,7 @@ func (b *DeploymentBuilder) getMainContainerEnv(krb5Config *KerberosConfig) []co
 	return env
 }
 
-func (b *DeploymentBuilder) getVolumes(s3Config *S3Config, krb5Cofig *KerberosConfig) []corev1.Volume {
+func (b *StatefulSetBuilder) getVolumes(s3Config *S3Config, krb5Cofig *KerberosConfig) []corev1.Volume {
 	volumes := []corev1.Volume{
 		{
 			Name: MatestoreConfigmapVolumeName,
@@ -324,7 +323,7 @@ func (b *DeploymentBuilder) getVolumes(s3Config *S3Config, krb5Cofig *KerberosCo
 	return volumes
 }
 
-func (b *DeploymentBuilder) getMainContainerVolumeMounts(s3Config *S3Config, krb5Cofig *KerberosConfig) []corev1.VolumeMount {
+func (b *StatefulSetBuilder) getMainContainerVolumeMounts(s3Config *S3Config, krb5Cofig *KerberosConfig) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      MatestoreConfigmapVolumeName,
@@ -347,7 +346,7 @@ func (b *DeploymentBuilder) getMainContainerVolumeMounts(s3Config *S3Config, krb
 	return volumeMounts
 }
 
-func NewDeploymentReconciler(
+func NewStatefulSetReconciler(
 	client *client.Client,
 	roleGroupInfo reconciler.RoleGroupInfo,
 	clusterConfig *hivev1alpha1.ClusterConfigSpec,
@@ -358,9 +357,9 @@ func NewDeploymentReconciler(
 	overrides *commonsv1alpha1.OverridesSpec,
 	roleGroupConfig *commonsv1alpha1.RoleGroupConfigSpec,
 	options ...builder.Option,
-) (*reconciler.Deployment, error) {
+) (*reconciler.StatefulSet, error) {
 
-	b := NewDeploymentBuilder(
+	b := NewStatefulSetBuilder(
 		client,
 		roleGroupInfo.GetFullName(),
 		clusterConfig,
@@ -371,7 +370,7 @@ func NewDeploymentReconciler(
 		options...,
 	)
 
-	return reconciler.NewDeployment(
+	return reconciler.NewStatefulSet(
 		client,
 		b,
 		stopped,

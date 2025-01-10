@@ -4,5 +4,6 @@ metadata:
   name: test-hive-metastore-default
 status:
   availableReplicas: 2
-  readyReplicas: 2
+  currentReplicas: 2
   replicas: 2
+  updatedReplicas: 2
