@@ -35,14 +35,6 @@ var (
 	}
 )
 
-type DeploymentBUilderOption struct {
-	ClusterName   string
-	RoleName      string
-	RoleGroupName string
-	Labels        map[string]string
-	Annotations   map[string]string
-}
-
 var _ builder.StatefulSetBuilder = &StatefulSetBuilder{}
 
 type StatefulSetBuilder struct {
