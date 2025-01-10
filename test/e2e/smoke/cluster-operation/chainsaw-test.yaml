@@ -46,7 +46,7 @@ spec:
     - assert:
         bindings:
           - name: available_replicas
-            value: 1
+            value: 0
         file: hive-assert.yaml
     # restart hive-metastore cluster, clusterOperation.stopped: false, clusterOperation.reconciliationPaused: false
   - name: restart hive-metastore cluster
