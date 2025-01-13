@@ -29,20 +29,10 @@ spec:
             value: true
         file: hive.yaml
     - assert:
-        resource: # TODO: refactor the hive kind to statefulset
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: test-hive-metastore-default
-          status:
-            conditions:
-              - reason: MinimumReplicasAvailable
-                type: Available
-                status: "True"
-              - reason: NewReplicaSetAvailable
-                type: Progressing
-                status: "True"
-            observedGeneration: 2
+        bindings:
+          - name: available_replicas
+            value: 0
+        file: hive-assert.yaml
     # pause hive-metastore cluster, clusterOperation.reconciliationPaused: true
   - name: pause hive-metastore cluster
     try:
@@ -54,9 +44,10 @@ spec:
             value: false
         file: hive.yaml
     - assert:
-        resource:
-          apiVersion: apps/v1
-          kind: Deployment
+        bindings:
+          - name: available_replicas
+            value: 0
+        file: hive-assert.yaml
     # restart hive-metastore cluster, clusterOperation.stopped: false, clusterOperation.reconciliationPaused: false
   - name: restart hive-metastore cluster
     try:

@@ -1,8 +1,9 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: test-hive-metastore-default
 status:
   availableReplicas: 2
-  readyReplicas: 2
+  currentReplicas: 2
   replicas: 2
+  updatedReplicas: 2
