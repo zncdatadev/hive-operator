@@ -182,12 +182,12 @@ HELM = $(LOCALBIN)/helm
 KIND = $(LOCALBIN)/kind
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.5.0
-CONTROLLER_TOOLS_VERSION ?= v0.16.5
-ENVTEST_VERSION ?= release-0.19
-GOLANGCI_LINT_VERSION ?= v1.61.0
-HELM_VERSION ?= v3.16.2
-KIND_VERSION ?= v0.24.0
+KUSTOMIZE_VERSION ?= v5.6.0
+CONTROLLER_TOOLS_VERSION ?= v0.17.1
+ENVTEST_VERSION ?= release-0.20
+GOLANGCI_LINT_VERSION ?= v1.63.4
+HELM_VERSION ?= v3.17.0
+KIND_VERSION ?= v0.26.0
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -259,13 +259,18 @@ endif
 ##@ Chainsaw-E2E
 
 # Tool Versions
-KINDTEST_K8S_VERSION ?= 1.26.15
-CHAINSAW_VERSION ?= v0.2.11
+# KIND_K8S_VERSION refers to the version of k8s to be used by kind.
+# The version only effects e2e tests.
+# When run `make kind-create`, the version of k8s will be used to create the kind cluster,
+# and the target kubeconfig file will be named as `./kind-kubeconfig-$(KIND_K8S_VERSION)`.
+# So if you want to use the target cluster, to run `export KUBECONFIG=./kind-kubeconfig-$(KIND_K8S_VERSION)`.
+KIND_K8S_VERSION ?= 1.26.15
+CHAINSAW_VERSION ?= v0.2.12
 PRODUCT_VERSION ?= 3.1.3
 
-KIND_IMAGE ?= kindest/node:v${KINDTEST_K8S_VERSION}
-KIND_KUBECONFIG ?= ./kind-kubeconfig-$(KINDTEST_K8S_VERSION)
-KIND_CLUSTER_NAME ?= ${PROJECT_NAME}-$(KINDTEST_K8S_VERSION)
+KIND_IMAGE ?= kindest/node:v${KIND_K8S_VERSION}
+KIND_KUBECONFIG ?= ./kind-kubeconfig-$(KIND_K8S_VERSION)
+KIND_CLUSTER_NAME ?= ${PROJECT_NAME}-$(KIND_K8S_VERSION)
 KIND_CONFIG ?= test/e2e/kind-config.yaml
 
 CHAINSAW = $(LOCALBIN)/chainsaw
