@@ -1,6 +1,7 @@
 module github.com/zncdatadev/hive-operator
 
 go 1.23.2
+toolchain go1.23.7
 
 require (
 	github.com/onsi/ginkgo/v2 v2.23.0
@@ -12,7 +13,7 @@ require (
 	sigs.k8s.io/controller-runtime v0.20.3
 )
 
-require github.com/zncdatadev/operator-go v0.12.1-0.20241204121924-b55bf9a24940
+require github.com/zncdatadev/operator-go v0.12.3
 
 require (
 	cel.dev/expr v0.18.0 // indirect
@@ -26,7 +27,7 @@ require (
 	github.com/cisco-open/k8s-objectmatcher v1.10.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
-	github.com/evanphx/json-patch v5.9.0+incompatible // indirect
+	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
