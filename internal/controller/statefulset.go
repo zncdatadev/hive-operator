@@ -109,19 +109,15 @@ func (b *StatefulSetBuilder) Build(ctx context.Context) (ctrlclient.Object, erro
 
 func (b *StatefulSetBuilder) setupVector(obj ctrlclient.Object) error {
 	if b.RoleGroupConfig != nil && b.RoleGroupConfig.Logging != nil && *b.RoleGroupConfig.Logging.EnableVectorAgent {
-		vector := builder.NewVectorDecorator(
-			obj,
-			b.GetImage(),
-			MatestoreLogVolumeName,
+		vector := builder.NewVector(
 			MatestoreConfigmapVolumeName,
-			b.Name,
+			MatestoreLogVolumeName,
+			b.GetImage(),
 		)
-		if err := vector.Decorate(); err != nil {
-			return err
-		}
-		return nil
-	}
 
+		b.AddContainer(vector.GetContainer())
+		b.AddVolumes(vector.GetVolumes())
+	}
 	return nil
 }
 
