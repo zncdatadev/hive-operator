@@ -11,6 +11,7 @@ import (
 	"github.com/zncdatadev/operator-go/pkg/constants"
 	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	"github.com/zncdatadev/operator-go/pkg/util"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -100,29 +101,26 @@ func (b *StatefulSetBuilder) Build(ctx context.Context) (ctrlclient.Object, erro
 		return nil, err
 	}
 
-	if err := b.setupVector(obj); err != nil {
-		return nil, err
-	}
+	b.setupVector(obj)
 
 	return obj, nil
 }
 
-func (b *StatefulSetBuilder) setupVector(obj ctrlclient.Object) error {
+func (b *StatefulSetBuilder) setupVector(obj *appsv1.StatefulSet) {
 	if b.RoleGroupConfig != nil && b.RoleGroupConfig.Logging != nil && *b.RoleGroupConfig.Logging.EnableVectorAgent {
-		vector := builder.NewVectorDecorator(
-			obj,
-			b.GetImage(),
-			MatestoreLogVolumeName,
+		vectorFactory := builder.NewVector(
 			MatestoreConfigmapVolumeName,
-			b.Name,
+			MatestoreLogVolumeName,
+			b.GetImage())
+		obj.Spec.Template.Spec.Containers = append(
+			obj.Spec.Template.Spec.Containers,
+			*vectorFactory.GetContainer(),
 		)
-		if err := vector.Decorate(); err != nil {
-			return err
-		}
-		return nil
+		obj.Spec.Template.Spec.Volumes = append(
+			obj.Spec.Template.Spec.Volumes,
+			vectorFactory.GetVolumes()...,
+		)
 	}
-
-	return nil
 }
 
 func (b *StatefulSetBuilder) getMainContainer(krb5Config *KerberosConfig, s3Config *S3Config) *builder.Container {
