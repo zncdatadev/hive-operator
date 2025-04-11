@@ -1,6 +1,6 @@
 module github.com/zncdatadev/hive-operator
 
-go 1.23.4
+go 1.24.1
 
 require (
 	github.com/onsi/ginkgo/v2 v2.23.4
