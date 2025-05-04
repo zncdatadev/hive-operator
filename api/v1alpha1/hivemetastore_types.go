@@ -51,6 +51,7 @@ type HiveMetastoreList struct {
 // HiveMetastoreSpec defines the desired state of HiveMetastore
 type HiveMetastoreSpec struct {
 	// +kubebuilder:validation:Optional
+	// +default:value={"repo": "quay.io/zncdatadev", "pullPolicy": "IfNotPresent"}
 	Image *ImageSpec `json:"image,omitempty"`
 
 	// +kubebuilder:validation:Required
