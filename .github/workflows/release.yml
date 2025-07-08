@@ -137,13 +137,6 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
 
-      - name: Build and push csi driver
-        run: |
-          make csi-docker-buildx
-
-      - name: Sign csi image
-        uses: ./.github/actions/sign-image
-
       - name: Build and push operator
         run: |
           make docker-buildx
