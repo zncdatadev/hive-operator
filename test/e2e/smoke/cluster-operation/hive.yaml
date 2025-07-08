@@ -11,7 +11,7 @@ spec:
   clusterConfig:
     database:
       databaseType: derby
-      connectionString: jdbc:derby:;databaseName=metastore_db;create=true
+      connString: jdbc:derby:;databaseName=metastore_db;create=true
       credentialsSecret: hive
   metastore:
     roleGroups:
