@@ -1,0 +1,30 @@
+name: Sign Image
+description: Use cosign to sign the image. You must have cosign installed and log in to the registry.
+
+inputs:
+  digest_file:
+    description: The file containing the image digest
+    required: false
+    default: docker-digests.json
+
+
+runs:
+  using: composite
+  steps:
+    - name: Sign image
+      shell: bash
+      env:
+        DIGEST_FILE: ${{ inputs.digest_file }}
+      run: |
+        # docker buildx metadata file will write to docker-digests.json default, it contains built image digests
+        # we need to extract the image digest from it, and convert it to OCI digest, then use cosign to sign it
+        IMAGE_NAME=$(jq -r '.["image.name"]' "${DIGEST_FILE}")
+        IMAGE_DIGEST=$(jq -r '.["containerimage.digest"]' "${DIGEST_FILE}")
+
+        # Convert to OCI digest
+        IMAGE_REF="${IMAGE_NAME%:*}@${IMAGE_DIGEST}"
+
+        echo "Signing image: $IMAGE_REF"
+
+        # Use cosign to sign the image
+        cosign sign --yes "${IMAGE_REF}"

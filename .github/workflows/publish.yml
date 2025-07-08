@@ -7,8 +7,8 @@ on:
 
 
 jobs:
-  publish-image:
-    name: Publish Image
+  publish:
+    name: Publish
     if: ${{ github.repository_owner == 'zncdatadev' }}
     runs-on: ubuntu-latest
     steps:
@@ -30,6 +30,10 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
 
-      - name: Build and push operator
+      - name: Build and push csi-driver
         run: |
-          make docker-buildx
+          make csi-docker-buildx
+
+      - name: Build and push oci chart
+        run: |
+          make chart-publish
