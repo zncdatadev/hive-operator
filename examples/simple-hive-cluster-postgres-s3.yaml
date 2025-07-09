@@ -21,7 +21,7 @@ spec:
     stackableVersion: 0.0.0-dev
   clusterConfig:
     database:
-      connectionString: jdbc:derby:;databaseName=/tmp/hive;create=true
+      connString: jdbc:derby:;databaseName=/tmp/hive;create=true
       credentialsSecret: hive-credentials
       databaseType: derby
     s3:

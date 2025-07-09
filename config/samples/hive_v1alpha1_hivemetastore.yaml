@@ -11,7 +11,7 @@ metadata:
 spec:
   clusterConfig:
     database:
-      connectionString: jdbc:derby:;databaseName=/tmp/hive;create=true
+      connString: jdbc:derby:;databaseName=/tmp/hive;create=true
       credentialsSecret: hive-credentials
       databaseType: derby
   metastore:

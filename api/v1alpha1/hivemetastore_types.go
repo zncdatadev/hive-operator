@@ -103,7 +103,7 @@ type S3Spec struct {
 
 type DatabaseSpec struct {
 	// +kubebuilder:validation:Required
-	ConnectionString string `json:"connectionString"`
+	ConnString string `json:"connString"`
 
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default="derby"

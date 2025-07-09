@@ -219,19 +219,19 @@ func (b *StatefulSetBuilder) getMainContainerEnv(krb5Config *KerberosConfig) []c
 	switch database.DatabaseType {
 	case "mysql":
 		jvmOpts = append(jvmOpts,
-			"-Djavax.jdo.option.ConnectionURL="+database.ConnectionString,
+			"-Djavax.jdo.option.ConnectionURL="+database.ConnString,
 			"-Djavax.jdo.option.ConnectionDriverName=com.mysql.cj.jdbc.Driver")
 	case "postgres":
 		jvmOpts = append(jvmOpts,
-			"-Djavax.jdo.option.ConnectionURL="+database.ConnectionString,
+			"-Djavax.jdo.option.ConnectionURL="+database.ConnString,
 			"-Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver")
 	case "oracle":
 		jvmOpts = append(jvmOpts,
-			"-Djavax.jdo.option.ConnectionURL="+database.ConnectionString,
+			"-Djavax.jdo.option.ConnectionURL="+database.ConnString,
 			"-Djavax.jdo.option.ConnectionDriverName=oracle.jdbc.OracleDriver")
 	case "derby":
 		jvmOpts = append(jvmOpts,
-			"-Djavax.jdo.option.ConnectionURL="+database.ConnectionString,
+			"-Djavax.jdo.option.ConnectionURL="+database.ConnString,
 			"-Djavax.jdo.option.ConnectionDriverName=org.apache.derby.jdbc.EmbeddedDriver")
 	default:
 		jvmOpts = append(jvmOpts,
