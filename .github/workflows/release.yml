@@ -41,6 +41,7 @@ jobs:
       - name: Run linter
         uses: golangci/golangci-lint-action@v8
 
+
   golang-test:
     name: Golang Test
     runs-on: ubuntu-latest
@@ -83,7 +84,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Create KinD clustet pur
+      - name: Create KinD cluster
         env:
           KIND_K8S_VERSION: ${{ matrix.k8s-version}}
           KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
@@ -118,6 +119,9 @@ jobs:
       - name: Clone the code
         uses: actions/checkout@v4
 
+      - name: Setup Cosign
+        uses: sigstore/cosign-installer@main
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -137,20 +141,56 @@ jobs:
         run: |
           make docker-buildx
 
-      - name: Setup Cosign
-        uses: sigstore/cosign-installer@main
+      - name: Sign operator image
+        uses: ./.github/actions/sign-image
 
-      - name: Sign image
+
+  chart-lint-test:
+    runs-on: ubuntu-latest
+    container:
+      image: public.ecr.aws/artifacthub/ah:v1.14.0
+      options: --user 1001
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run ah lint
+        working-directory: ./charts
+        run: ah lint
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4.3.0
+
+      - name: Setup Chart Linting
+        id: lint
+        uses: helm/chart-testing-action@v2.7.0
+
+      - name: Run chart-testing (list-changed)
+        id: list-changed
         run: |
-          # docker buildx metadata file will write to docker-digests.json, it contains built image digests
-          # we need to extract the image digest from it, and convert it to OCI digest, then use cosign to sign it
-          IMAGE_NAME=$(jq -r '.["image.name"]' docker-digests.json)
-          IMAGE_DIGEST=$(jq -r '.["containerimage.digest"]' docker-digests.json)
+          changed=$(ct list-changed --target-branch ${{ github.event.repository.default_branch }})
+          if [[ -n "$changed" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Run chart-testing (lint)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: ct lint --debug --config ./.github/configs/ct-lint.yaml
 
-          # Convert to OCI digest
-          IMAGE_REF="${IMAGE_NAME%:*}@${IMAGE_DIGEST}"
+      - name: Create kind cluster
+        if: steps.list-changed.outputs.changed == 'true'
+        uses: helm/kind-action@v1.10.0
 
-          echo "Signing image: $IMAGE_REF"
+      - name: Run chart-testing (install)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: ct install --config ./.github/configs/ct-install.yaml
 
-          # Use cosign to sign the image
-          cosign sign --yes ${IMAGE_REF}
+
+  release-chart:
+    name: Release Chart
+    if: ${{ github.repository_owner == 'zncdatadev' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build and push oci chart
+        run: |
+          make chart-publish

@@ -7,8 +7,8 @@ on:
 
 
 jobs:
-  publish-image:
-    name: Publish Image
+  publish:
+    name: Publish
     if: ${{ github.repository_owner == 'zncdatadev' }}
     runs-on: ubuntu-latest
     steps:
@@ -33,3 +33,7 @@ jobs:
       - name: Build and push operator
         run: |
           make docker-buildx
+
+      - name: Build and push oci chart
+        run: |
+          make chart-publish

@@ -1,0 +1,14 @@
+## Reference: https://github.com/helm/chart-testing/blob/main/doc/ct_lint.md
+# Don't add the 'debug' attribute, otherwise the workflow won't work anymore
+# Only Used for the CT Lint Stage
+remote: origin
+target-branch: main
+chart-dirs:
+  - deploy/helm
+chart-repos: []
+validate-chart-schema: false
+validate-maintainers: false
+validate-yaml: true
+exclude-deprecated: true
+check-version-increment: false
+excluded-charts: []

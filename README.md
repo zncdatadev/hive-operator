@@ -13,26 +13,20 @@ together seamlessly. Based on Kubernetes, it runs everywhere – on prem or in t
 
 ## Quick Start
 
-### Add helm repository
+### Install Requirements Dependencies
 
-> Please make sure helm version is v3.0.0+
+> Please make sure helm version is v3.8.0+
 
 ```bash
-helm repo add kubedoop https://zncdatadev.github.io/kubedoop-helm-charts/
+helm install commons-operator oci://quay.io/kubedoopcharts/commons-operator
+helm install listener-operator oci://quay.io/kubedoopcharts/listener-operator
+helm install secret-operator oci://quay.io/kubedoopcharts/secret-operator
 ```
 
-### Add required dependencies
+### Install hive-operator
 
 ```bash
-helm install commons-operator kubedoop/commons-operator
-helm install listener-operator kubedoop/listener-operator
-helm install secret-operator kubedoop/secret-operator
-```
-
-### Add hive-operator
-
-```bash
-helm install hive-operator kubedoop/hive-operator
+helm install hive-operator oci://quay.io/kubedoopcharts/hive-operator
 ```
 
 ### Deploy hive cluster
