@@ -1,0 +1,15 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: smoke-ha
+spec:
+  steps:
+  - name: install hive
+    try:
+    # install hive
+    - apply:
+        file: hive.yaml
+    - assert:
+        file: hive-assert.yaml
+  - name: access metastore
+    description: todo Access the metastore
