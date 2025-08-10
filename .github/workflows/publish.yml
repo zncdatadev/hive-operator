@@ -7,8 +7,8 @@ on:
 
 
 jobs:
-  publish:
-    name: Publish
+  publish-image:
+    name: Publish Image
     if: ${{ github.repository_owner == 'zncdatadev' }}
     runs-on: ubuntu-latest
     steps:
@@ -34,6 +34,91 @@ jobs:
         run: |
           make docker-buildx
 
+
+  publish-chart:
+    name: Publish Chart
+    if: ${{ github.repository_owner == 'zncdatadev' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Login to quay.io
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_CHART_USERNAME }}
+          password: ${{ secrets.QUAY_CHART_PASSWORD }}
+
       - name: Build and push oci chart
         run: |
           make chart-publish
+
+      - name: Clone helm charts repository
+        uses: actions/checkout@v4
+        with:
+          repository: zncdatadev/kubedoop-helm-charts
+          ref: gh-pages
+          # Use PAT for authentication, must be a repo content rw scope token
+          # Subsequent commits to the repository require read and write permissions
+          token: ${{ secrets.HELM_CHARTS_REPO_TOKEN }}
+          path: kubedoop-helm-charts
+
+      - name: Update helm charts index
+        run: |
+          OCI_REGISTRY="oci://quay.io/kubedoopcharts"
+
+          # Ensure chart index.yaml exists
+          if [ ! -f kubedoop-helm-charts/index.yaml ]; then
+            echo "index.yaml not found"
+            exit 1
+          fi
+
+          # Get chart package file from the target directory, ensuring exactly one exists
+          CHART_PACKAGES=$(ls target/charts/*.tgz)
+          if [ $(echo "$CHART_PACKAGES" | wc -l) -ne 1 ]; then
+            echo "Expected exactly one chart package, found: $CHART_PACKAGES"
+            exit 1
+          fi
+          CHART_PACKAGE=$(basename $CHART_PACKAGES)
+
+          # Extract chart name and version from package filename
+          # Examples:
+          # foo-0.0.0-dev.tgz -> CHART_NAME=foo, CHART_VERSION=0.0.0-dev
+          # foo-12.0.1.tgz -> CHART_NAME=foo, CHART_VERSION=12.0.1
+          # my-chart-2-operator-1.0.0.tgz -> CHART_NAME=my-chart-2-operator, CHART_VERSION=1.0.0
+          # Strategy: Find the last occurrence of -[digit] pattern, that's where version starts
+          CHART_NAME=$(echo $CHART_PACKAGE | sed 's/-[0-9]\+\..*\.tgz$//')
+          CHART_VERSION=$(echo $CHART_PACKAGE | sed "s/^$CHART_NAME-\(.*\)\.tgz$/\1/")
+
+          # Validate extracted CHART_NAME and CHART_VERSION
+          if [ -z "$CHART_NAME" ] || [ -z "$CHART_VERSION" ]; then
+            echo "Failed to extract CHART_NAME or CHART_VERSION from package filename: $CHART_PACKAGE"
+            exit 1
+          fi
+
+          # Regenerate the index.yaml file for the helm charts repository
+          helm repo index --url $OCI_REGISTRY --merge kubedoop-helm-charts/index.yaml target/charts
+          # Replace .tgz in URL with OCI tag (remove .tgz suffix)
+          sed -i "s|$OCI_REGISTRY/$CHART_PACKAGE|$OCI_REGISTRY/$CHART_NAME:$CHART_VERSION|" target/charts/index.yaml
+
+          # Copy the updated index.yaml to the kubedoop-helm-charts directory
+          cp target/charts/index.yaml kubedoop-helm-charts/index.yaml
+
+          # Push index.yaml to the kubedoop-helm-charts repository
+          cd kubedoop-helm-charts
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add index.yaml
+          # Only commit and push if there are changes
+          if ! git diff --cached --quiet; then
+            git commit -m "Update index"
+            git push origin gh-pages
+          else
+            echo "No changes to commit."
+          fi
