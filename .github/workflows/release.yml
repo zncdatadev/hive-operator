@@ -144,6 +144,17 @@ jobs:
       - name: Sign operator image
         uses: ./.github/actions/sign-image
 
+  chart-linter-artifacthub:
+    runs-on: ubuntu-latest
+    container:
+      image: public.ecr.aws/artifacthub/ah:v1.14.0
+      options: --user 1001
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Run ah lint
+        working-directory: deploy/helm
+        run: ah lint
 
   chart-lint-test:
     runs-on: ubuntu-latest
@@ -167,40 +178,103 @@ jobs:
           python-version: '3.x'
           check-latest: true
 
-      - name: Setup Chart Linting
-        id: lint
-        uses: helm/chart-testing-action@v2.7.0
+      - name: Fetch all tags
+        run: git fetch --tags --force
 
-      - name: Run chart-testing (list-changed)
-        id: list-changed
+      - name: Get commit range
+        id: commit-range
         run: |
-          changed=$(ct list-changed --chart-dirs deploy/helm --target-branch ${{ github.event.repository.default_branch }})
-          if [[ -n "$changed" ]]; then
+          # Get current and previous tag
+          CURRENT_TAG="${{ github.ref_name }}"
+          PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -A1 "^${CURRENT_TAG}$" | tail -n1)
+
+          # First release detection
+          if [[ "$PREVIOUS_TAG" == "$CURRENT_TAG" || -z "$PREVIOUS_TAG" ]]; then
+            echo "First release detected - marking all charts as changed"
             echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "target_branch=main" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Get previous tag commit
+          PREVIOUS_COMMIT=$(git rev-list -n 1 "$PREVIOUS_TAG")
+          echo "Current commit for previous tag ($PREVIOUS_TAG): $PREVIOUS_COMMIT"
+
+          # Get the branch name(s) of the previous commit, prefer release branches, then main, then others
+          PREVIOUS_BRANCHES=$(git branch -r --contains "$PREVIOUS_COMMIT" | sed 's/^[ *]*//')
+          echo "Found branches containing the previous commit: $PREVIOUS_BRANCHES"
+
+          # Define branch priority: release branches (sorted), then main, then others
+          PRIORITY_BRANCH=""
+          # 1. Find release branches (sorted lexicographically)
+          RELEASE_BRANCH=$(echo "$PREVIOUS_BRANCHES" | grep -E 'origin/release' | sort | head -n1)
+          if [[ -n "$RELEASE_BRANCH" ]]; then
+            PRIORITY_BRANCH="$RELEASE_BRANCH"
+          else
+            # 2. Fallback to main
+            MAIN_BRANCH=$(echo "$PREVIOUS_BRANCHES" | grep -E '^origin/main$')
+            if [[ -n "$MAIN_BRANCH" ]]; then
+              PRIORITY_BRANCH="$MAIN_BRANCH"
+            else
+              # 3. Fallback to the first other branch
+              PRIORITY_BRANCH=$(echo "$PREVIOUS_BRANCHES" | head -n1)
+            fi
+          fi
+
+          echo "Removing 'origin/' from branches"
+          PRIORITY_BRANCH=$(echo "$PRIORITY_BRANCH" | sed 's|^origin/||')
+          echo "Selected target branch for comparison: $PRIORITY_BRANCH"
+
+          echo "target_branch=$PRIORITY_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "since_commit=$PREVIOUS_COMMIT" >> "$GITHUB_OUTPUT"
+
+      - name: Check chart changes
+        id: check-changes
+        run: |
+          # Check for changes in chart directory using both --since and --target-branch parameters
+          if ! changed=$(ct list-changed \
+            --chart-dirs deploy/helm \
+            --since "${{ steps.commit-range.outputs.since_commit }}" \
+            --target-branch "${{ steps.commit-range.outputs.target_branch }}"); then
+            echo "Failed to check for changes"
+            exit 1
+          fi
+
+          if [[ -n "$changed" ]]; then
+            echo "Changed charts detected: $changed"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No chart changes detected"
           fi
 
       - name: Run chart-testing (lint)
-        if: steps.list-changed.outputs.changed == 'true'
-        run: ct lint --debug --config ./.github/configs/ct-lint.yaml
+        if: steps.check-changes.outputs.changed == 'true'
+        run: |
+          ct lint \
+            --since "${{ steps.commit-range.outputs.since_commit }}" \
+            --target-branch "${{ steps.commit-range.outputs.target_branch }}" \
+            --config ./.github/configs/ct-lint.yaml
 
       - name: Create kind cluster
-        if: steps.list-changed.outputs.changed == 'true'
+        if: steps.check-changes.outputs.changed == 'true'
         uses: helm/kind-action@v1.12.0
         with:
           cluster_name: kind  # Default cluster name is 'chart-testing'
 
       - name: Load images to cluster
-        if: steps.list-changed.outputs.changed == 'true'
+        if: steps.check-changes.outputs.changed == 'true'
         run: |
           make docker-build
           kind load docker-image quay.io/zncdatadev/hive-operator:${{ env.VERSION }}
 
-
       - name: Run chart-testing (install)
         id: ct-test
-        if: steps.list-changed.outputs.changed == 'true'
+        if: steps.check-changes.outputs.changed == 'true'
         run: |
-          ct install --config ./.github/configs/ct-install.yaml
+          ct install \
+            --since "${{ steps.commit-range.outputs.since_commit }}" \
+            --target-branch "${{ steps.commit-range.outputs.target_branch }}" \
+            --config ./.github/configs/ct-install.yaml
           # Save success result to github output
           if [[ $? -eq 0 ]]; then
             echo "ct_tested=true" >> "$GITHUB_OUTPUT"
@@ -230,12 +304,13 @@ jobs:
           make chainsaw
           ./bin/chainsaw test --test-dir ./test/e2e/
 
-
-
   release-chart:
     name: Release Chart
     if: ${{ github.repository_owner == 'zncdatadev' }}
     runs-on: ubuntu-latest
+    needs:
+      - chart-linter-artifacthub
+      - chart-lint-test
     steps:
       - name: Clone the code
         uses: actions/checkout@v4
