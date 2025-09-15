@@ -283,9 +283,6 @@ jobs:
       - name: Run e2e with chart
         if: steps.ct-test.outputs.ct_tested == 'true'
         run: |
-          # Add kubedoop helm repo
-          helm repo add kubedoop https://zncdatadev.github.io/kubedoop-helm-charts/
-
           HELM_DEPENDENCIES=(
             commons-operator
             listener-operator
@@ -294,7 +291,7 @@ jobs:
 
           # Install dependencies
           for dep in "${HELM_DEPENDENCIES[@]}"; do
-            helm upgrade --install --create-namespace --namespace kubedoop-operators --wait $dep kubedoop/$dep
+            helm upgrade --install --create-namespace --namespace kubedoop-operators --wait  $dep oci://quay.io/kubedoopcharts/$dep --version $VERSION
           done
 
           # Install hive-operator chart
