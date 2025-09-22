@@ -88,7 +88,7 @@ jobs:
         if: steps.list-changed.outputs.changed == 'true'
         run: |
           make docker-build
-          kind load docker-image quay.io/zncdatadev/hive-operator:${{ env.VERSION }}
+          kind load docker-image quay.io/zncdatadev/hive-operator:$VERSION
 
 
       - name: Run chart-testing (install)
