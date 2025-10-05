@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -40,8 +40,7 @@ jobs:
       options: --user 1001
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@v5
       - name: Run ah lint
         working-directory: deploy/helm
         run: ah lint
@@ -50,12 +49,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4.3.0
+        uses: azure/setup-helm@v4.3.1
 
       - uses: actions/setup-python@v5
         with:
@@ -88,7 +87,7 @@ jobs:
         if: steps.list-changed.outputs.changed == 'true'
         run: |
           make docker-build
-          kind load docker-image quay.io/zncdatadev/hive-operator:${{ env.VERSION }}
+          kind load docker-image quay.io/zncdatadev/hive-operator:$VERSION
 
 
       - name: Run chart-testing (install)
