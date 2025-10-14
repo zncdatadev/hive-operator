@@ -19,12 +19,8 @@ spec:
         file: vector-aggregator-assert.yaml
   - name: install postgressql
     try:
-    - script:
-        env:
-          - name: NAMESPACE
-            value: ($namespace)
-        content: >-
-          bash  ../setup/postgres-install.sh
+    - apply:
+        file: ../setup/postgres.yaml
     - assert:
         file: ../setup/postgres-assert.yaml
   - name: install hive
@@ -53,6 +49,3 @@ spec:
             echo "Did not find expected log pattern"
             exit 1
           fi
-    cleanup:
-    - sleep:
-        duration: 50s

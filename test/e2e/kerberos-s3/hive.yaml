@@ -8,7 +8,7 @@ spec:
   clusterConfig:
     database:
       databaseType: derby
-      connString: jdbc:derby:;databaseName=metastore_db;create=true
+      connString: jdbc:derby:;databaseName=hive;create=true
       credentialsSecret: hive-credentials
     authentication:
       kerberos:

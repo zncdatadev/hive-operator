@@ -64,13 +64,9 @@ spec:
   - name: install minio
     try:
     - apply:
-        file: ../setup/minio-secret.yaml
-    - script:
-        env:
-        - name: NAMESPACE
-          value: ($namespace)
-        content: |
-          bash ../setup/minio-install.sh
+        file: ../setup/minio.yaml
+    - assert:
+        file: ../setup/minio-assert.yaml
   - name: install hive
     try:
     - apply:
