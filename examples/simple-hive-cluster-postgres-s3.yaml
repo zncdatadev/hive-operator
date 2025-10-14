@@ -18,7 +18,6 @@ metadata:
 spec:
   image:
     productVersion: 4.0.1
-    stackableVersion: 0.0.0-dev
   clusterConfig:
     database:
       connString: jdbc:derby:;databaseName=/tmp/hive;create=true
