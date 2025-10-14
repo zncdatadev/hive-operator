@@ -8,7 +8,7 @@ spec:
   clusterConfig:
     database:
       databaseType: postgres
-      connString: jdbc:postgresql://hive-postgresql:5432/hive
+      connString: jdbc:postgresql://hive-postgres:5432/hive
       credentialsSecret: hive-credentials
     vectorAggregatorConfigMapName: vector-aggregator-discovery
   metastore:

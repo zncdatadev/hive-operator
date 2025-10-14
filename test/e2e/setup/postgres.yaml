@@ -1,0 +1,68 @@
+# https://quay.io/repository/fedora/postgresql-16
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hive-postgres
+  labels:
+    app.kubernetes.io/name: hive-postgresgres
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hive-postgres
+  serviceName: hive-postgres
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hive-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: quay.io/fedora/postgresql-16:20250924
+        env:
+        - name: POSTGRESQL_DATABASE
+          value: hive
+        - name: POSTGRESQL_USER
+          value: hive
+        - name: POSTGRESQL_PASSWORD
+          value: hive
+        ports:
+        - containerPort: 5432
+          name: db
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        livenessProbe:
+          tcpSocket:
+            port: db
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          tcpSocket:
+            port: db
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 3
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hive-postgres
+  labels:
+    app.kubernetes.io/name: hive-postgres
+spec:
+  selector:
+    app.kubernetes.io/name: hive-postgres
+  ports:
+  - port: 5432
+    targetPort: db
