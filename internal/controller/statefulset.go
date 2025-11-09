@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"strings"
 
@@ -19,6 +20,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
+	"github.com/zncdatadev/hive-operator/internal/constant"
 )
 
 var (
@@ -29,9 +31,14 @@ var (
 
 	ContainerPort = []corev1.ContainerPort{
 		{
-			ContainerPort: 9083,
+			ContainerPort: constant.MetastorePort,
 			Protocol:      corev1.ProtocolTCP,
-			Name:          MetastorePortName,
+			Name:          constant.MetastorePortName,
+		},
+		{
+			ContainerPort: constant.MetricsPort,
+			Protocol:      corev1.ProtocolTCP,
+			Name:          constant.MetricsPortName,
 		},
 	}
 )
@@ -195,7 +202,10 @@ func (b *StatefulSetBuilder) getJVMOpts(
 	envs []corev1.EnvVar,
 ) corev1.EnvVar {
 	jvmOpt := []string{
-		"-javaagent:" + path.Join(constants.KubedoopJmxDir, "jmx_prometheus_javaagent.jar") + "=8080:" + path.Join(constants.KubedoopJmxDir, "config.yaml"),
+		fmt.Sprintf("-javaagent:%s=%d:%s",
+			path.Join(constants.KubedoopJmxDir, "jmx_prometheus_javaagent.jar"),
+			constant.MetricsPort,
+			path.Join(constants.KubedoopJmxDir, "config.yaml")),
 	}
 
 	for _, env := range envs {
