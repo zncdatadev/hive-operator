@@ -133,5 +133,10 @@ func (r *RoleReconciler) GetImageResourceWithRoleGroup(
 
 		},
 	)
-	return []reconciler.Reconciler{cm, sts, svc}, nil
+
+	metricsSvc := NewRoleGroupMetricsService(
+		r.Client,
+		&info,
+	)
+	return []reconciler.Reconciler{cm, sts, svc, metricsSvc}, nil
 }
