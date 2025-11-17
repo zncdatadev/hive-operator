@@ -47,7 +47,7 @@ func NewRoleGroupMetricsService(
 		annotations[k] = v
 	}
 	annotations["prometheus.io/scrape"] = constant.TrueValue
-	annotations["prometheus.io/path"] = "/prom"
+	// annotations["prometheus.io/path"] = "/metrics"  // Uncomment and modify if a specific path is needed, default is /metrics
 	annotations["prometheus.io/port"] = strconv.Itoa(metricsPort)
 	annotations["prometheus.io/scheme"] = scheme
 
