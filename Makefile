@@ -172,10 +172,14 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 chart: manifests kustomize ## Generate helm chart for the operator.
 	"$(KUSTOMIZE)" build config/crd > deploy/helm/$(PROJECT_NAME)/crds/crds.yaml
 
-.PHONY: helm-chart-publish ## Publish helm chart for the operator.
-helm-chart-publish: helm chart ## Publish helm chart for the operator.
+.PHONY: helm-chart-package ## Package helm chart for the operator.
+helm-chart-package: chart ## Package helm chart for the operator.
 	mkdir -p target/charts
+	rm -rf target/charts/*.tgz
 	"$(HELM)" package deploy/helm/$(PROJECT_NAME) --version $(VERSION) --app-version $(VERSION) --destination target/charts
+
+.PHONY: helm-chart-publish ## Publish helm chart for the operator.
+helm-chart-publish: helm-chart-package ## Publish helm chart for the operator.
 	"$(HELM)" push target/charts/$(PROJECT_NAME)-$(VERSION).tgz $(OCI_REGISTRY)
 
 

@@ -142,6 +142,8 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+# Ignore kubeconfig files
+.kubeconfig*
 kind-kubeconfig*
 kind-config-local.yaml
 
@@ -154,6 +156,7 @@ cover.out
 # ai code local
 .codiumai.toml
 
+# Ignore docker digest files
 docker-digests.json
 
 
