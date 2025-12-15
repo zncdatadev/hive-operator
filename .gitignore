@@ -144,8 +144,12 @@ Temporary Items
 
 # Ignore kubeconfig files
 .kubeconfig*
-kind-kubeconfig*
-kind-config-local.yaml
+
+# Ignore docker digest files
+docker-digests.json
+
+*-local.yaml
+*-local.*
 
 # test
 ginkgo.report
@@ -155,9 +159,6 @@ cover.out
 
 # ai code local
 .codiumai.toml
-
-# Ignore docker digest files
-docker-digests.json
 
 
 # helm charts
