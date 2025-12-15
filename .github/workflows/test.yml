@@ -27,7 +27,7 @@ jobs:
           make test
 
 
-  chainsaw-test:
+  chainsaw-e2e:
     name: Chainsaw Test
     runs-on: ubuntu-latest
     strategy:

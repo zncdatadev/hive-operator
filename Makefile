@@ -317,14 +317,13 @@ PRODUCT_VERSION ?= 3.1.3
 KIND_IMAGE ?= kindest/node:v${KIND_K8S_VERSION}
 CHAINSAW_KUBECONFIG ?= ./kind-kubeconfig-$(KIND_K8S_VERSION)
 KIND_CLUSTER_NAME ?= ${PROJECT_NAME}-$(KIND_K8S_VERSION)
-KIND_CONFIG ?= test/e2e/kind-config.yaml
 
 CHAINSAW = $(LOCALBIN)/chainsaw
 
 # Create a kind cluster
 .PHONY: setup-chainsaw-cluster
 setup-chainsaw-cluster: kind ## Create a kind cluster.
-	$(KIND) create cluster --config $(KIND_CONFIG) --image $(KIND_IMAGE) --name $(KIND_CLUSTER_NAME) --kubeconfig $(CHAINSAW_KUBECONFIG) --wait 120s
+	$(KIND) create cluster --image $(KIND_IMAGE) --name $(KIND_CLUSTER_NAME) --kubeconfig $(CHAINSAW_KUBECONFIG) --wait 120s
 
 .PHONY: cleanup-chainsaw-cluster
 cleanup-chainsaw-cluster: kind ## Delete a kind cluster.
