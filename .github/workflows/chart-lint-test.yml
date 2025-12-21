@@ -22,6 +22,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+
       - name: Check CRDs sync
         run: |
           # Use `make manifests` to generate the CRDs
@@ -29,24 +30,29 @@ jobs:
           # Check if the CRDs are in sync with the manifests
           if ! git diff --exit-code; then
             echo "CRDs are not in sync with the manifests."
-            echo "Please run 'make manifest' to update the CRDs."
+            echo "Please run 'make manifests' to update the CRDs."
             exit 1
           fi
 
   linter-artifacthub:
     runs-on: ubuntu-latest
+    needs:
+      - check-crds-sync
     container:
       image: public.ecr.aws/artifacthub/ah:v1.14.0
       options: --user 1001
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
       - name: Run ah lint
         working-directory: deploy/helm
         run: ah lint
 
   lint-test:
     runs-on: ubuntu-latest
+    needs:
+      - check-crds-sync
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -56,7 +62,8 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@v4.3.1
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.x'
           check-latest: true
@@ -100,6 +107,11 @@ jobs:
             echo "ct_tested=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Build helm chart
+        if: steps.ct-test.outputs.ct_tested == 'true'
+        run: |
+          make helm-chart-package
+
       - name: Run e2e with chart
         if: steps.ct-test.outputs.ct_tested == 'true'
         run: |
@@ -114,8 +126,8 @@ jobs:
             helm upgrade --install --create-namespace --namespace kubedoop-operators --wait $dep oci://quay.io/kubedoopcharts/$dep --version $VERSION
           done
 
-          # Install hive-operator chart
-          helm install --create-namespace --namespace hive-operators --wait hive-operator ./deploy/helm/hive-operator
+          # Install packaged operator chart
+          helm install --create-namespace --namespace hive-operators --wait hive-operator ./target/charts/hive-operator-$VERSION.tgz
 
           # E2E tests
           make chainsaw

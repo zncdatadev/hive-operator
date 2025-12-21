@@ -27,7 +27,7 @@ jobs:
           make test
 
 
-  chainsaw-test:
+  chainsaw-e2e:
     name: Chainsaw Test
     runs-on: ubuntu-latest
     strategy:
@@ -42,7 +42,6 @@ jobs:
           '1.32.0'
         ]
         product-version: ['3.1.3', '4.0.1']
-      # max-parallel: 2
     steps:
       - name: Clone the code
         uses: actions/checkout@v4
@@ -55,18 +54,18 @@ jobs:
       - name: Create KinD cluster
         env:
           KIND_K8S_VERSION: ${{ matrix.k8s-version}}
-          KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
-        run: make kind-create
+          CHAINSAW_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        run: make setup-chainsaw-cluster
 
-      - name: Chainsaw test setup
+      - name: Setup Chainsaw
         env:
           KIND_K8S_VERSION: ${{ matrix.k8s-version }}
-          KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
-        run: make chainsaw-setup
+          CHAINSAW_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        run: make setup-chainsaw-e2e
 
-      - name: Test with Chainsaw
+      - name: Run chainsaw-e2e
         env:
           KIND_K8S_VERSION: ${{ matrix.k8s-version }}
-          KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+          CHAINSAW_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
           PRODUCT_VERSION: ${{ matrix.product-version }}
-        run: make chainsaw-test
+        run: make chainsaw-e2e
