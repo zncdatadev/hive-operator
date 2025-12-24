@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone the code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -43,7 +43,7 @@ jobs:
       options: --user 1001
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Run ah lint
         working-directory: deploy/helm
@@ -55,7 +55,7 @@ jobs:
       - check-crds-sync
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
