@@ -60,3 +60,32 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Get metrics port based on secure setting
+*/}}
+{{- define "operator.metricsPort" -}}
+{{- .Values.metrics.service.port | default (ternary 8443 8080 .Values.metrics.secure) }}
+{{- end }}
+
+{{/*
+Get metrics port name based on secure setting
+*/}}
+{{- define "operator.metricsPortName" -}}
+{{- ternary "https" "http" .Values.metrics.secure }}
+{{- end }}
+
+{{/*
+Get metrics scheme based on secure setting
+*/}}
+{{- define "operator.metricsScheme" -}}
+{{- ternary "https" "http" .Values.metrics.secure }}
+{{- end }}
+
+{{/*
+Get health probe port from bind address
+*/}}
+{{- define "operator.healthProbePort" -}}
+{{- $bindAddress := .Values.healthProbe.bindAddress | default ":8081" }}
+{{- regexFind "[0-9]+$" $bindAddress }}
+{{- end }}

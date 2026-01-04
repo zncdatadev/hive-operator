@@ -34,6 +34,41 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            {{- if .Values.metrics.enabled }}
+            - --metrics-bind-address=:{{ include "operator.metricsPort" . }}
+            {{- if .Values.metrics.secure }}
+            - --metrics-secure=true
+            {{- else }}
+            - --metrics-secure=false
+            {{- end }}
+            {{- end }}
+            - --health-probe-bind-address={{ .Values.healthProbe.bindAddress | default ":8081" }}
+          ports:
+            {{- if .Values.metrics.enabled }}
+            - name: {{ include "operator.metricsPortName" . }}
+              containerPort: {{ include "operator.metricsPort" . }}
+              protocol: TCP
+            {{- end }}
+            - name: healthz
+              containerPort: {{ include "operator.healthProbePort" . }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: healthz
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
