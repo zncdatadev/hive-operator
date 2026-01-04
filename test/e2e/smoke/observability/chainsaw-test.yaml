@@ -50,7 +50,7 @@ spec:
 
               # Test metrics endpoint accessibility
               HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9084/metrics)
-              if [[ "$HTTP_CODE" != "200" ]]; then
+              if [ "$HTTP_CODE" != "200" ]; then
                 echo "ERROR: Failed to access metrics endpoint, HTTP code: $HTTP_CODE"
                 kill $PF_PID 2>/dev/null || true
                 exit 1
@@ -137,7 +137,7 @@ spec:
             # Port-forward
             kubectl port-forward -n "$NAMESPACE" svc/prometheus-server 9090:80 > /dev/null 2>&1 &
             PF_PID=$!
-            sleep 2
+            sleep 5
 
             trap "kill $PF_PID 2>/dev/null || true" EXIT
 
