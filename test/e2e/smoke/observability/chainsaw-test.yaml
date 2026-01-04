@@ -1,0 +1,177 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: smoke-observability
+spec:
+  steps:
+  # 1. Install HiveMetastore
+  - name: install hive
+    try:
+      - apply:
+          file: hive.yaml
+      - assert:
+          file: hive-assert.yaml
+      - assert:
+          timeout: 240s
+          resource:
+            kind: StatefulSet
+            apiVersion: apps/v1
+            metadata:
+              name: test-hive-observability-metastore-default
+              namespace: ($namespace)
+            status:
+              readyReplicas: 2
+
+  # 2. Verify metrics port connectivity and format
+  - name: verify metrics connectivity
+    try:
+      - script:
+          bindings:
+          - name: NAMESPACE
+            value: ($namespace)
+          content: |
+            #!/bin/bash
+            set -ex
+
+            # Get all pods
+            echo "Namespace: $NAMESPACE"
+            PODS=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/component=metastore,app.kubernetes.io/instance=test-hive-observability -o jsonpath='{.items[*].metadata.name}')
+            echo "Found pods: $PODS"
+
+            for POD in $PODS; do
+              echo "Testing Pod: $POD"
+
+              # Port-forward to pod
+              kubectl port-forward -n "$NAMESPACE" "$POD" 9084:9084 > /dev/null 2>&1 &
+              PF_PID=$!
+              sleep 2
+
+              trap "kill $PF_PID 2>/dev/null || true" EXIT
+
+              # Test metrics endpoint accessibility
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9084/metrics)
+              if [ "$HTTP_CODE" != "200" ]; then
+                echo "ERROR: Failed to access metrics endpoint, HTTP code: $HTTP_CODE"
+                kill $PF_PID 2>/dev/null || true
+                exit 1
+              fi
+
+              # Fetch metrics
+              METRICS=$(curl -s http://localhost:9084/metrics)
+
+              # Verify Prometheus format
+              if ! echo "$METRICS" | grep -q "# TYPE"; then
+                echo "ERROR: Missing Prometheus format (# TYPE)"
+                kill $PF_PID 2>/dev/null || true
+                exit 1
+              fi
+
+              # Verify JVM metrics present
+              if ! echo "$METRICS" | grep -q "jvm_"; then
+                echo "ERROR: Missing JVM metrics"
+                kill $PF_PID 2>/dev/null || true
+                exit 1
+              fi
+
+              # Verify specific metrics (arbitrary metric to ensure data is present)
+              if ! echo "$METRICS" | grep -q "jvm_memory_used_bytes"; then
+                echo "WARNING: Expected metric 'jvm_memory_used_bytes' not found"
+              fi
+
+              echo "✓ Pod $POD metrics OK"
+
+              # Cleanup
+              kill $PF_PID 2>/dev/null || true
+              sleep 1
+            done
+
+            echo "✓ All pods metrics verified"
+
+  # 3. Install Prometheus
+  - name: install prometheus
+    try:
+      - script:
+          bindings:
+            - name: NAMESPACE
+              value: ($namespace)
+          content: |
+            #!/bin/bash
+            set -ex
+
+            echo "=== Environment Check ==="
+            echo "NAMESPACE variable: '$NAMESPACE'"
+            echo "NAMESPACE length: ${#NAMESPACE}"
+            if [ -z "$NAMESPACE" ]; then
+              echo "ERROR: NAMESPACE is empty!"
+              exit 1
+            fi
+
+            helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
+            helm repo update
+
+            echo "=== Installing Prometheus ==="
+            echo "Will install to namespace: $NAMESPACE"
+
+            helm upgrade --install prometheus prometheus-community/prometheus \
+              --version 25.3.1 \
+              --namespace "$NAMESPACE" \
+              --create-namespace \
+              -f prometheus-values.yaml \
+              --wait --timeout 5m
+
+  # 4. Verify Prometheus targets
+  - name: verify prometheus targets
+    try:
+      - script:
+          bindings:
+            - name: NAMESPACE
+              value: ($namespace)
+          content: |
+            #!/bin/bash
+            set -e
+
+            # Wait for Prometheus server pod
+            kubectl wait --for=condition=Ready pod -l app=prometheus,component=server -n "$NAMESPACE" --timeout=300s 2>/dev/null || true
+            sleep 3
+
+            # Port-forward
+            kubectl port-forward -n "$NAMESPACE" svc/prometheus-server 9090:80 > /dev/null 2>&1 &
+            PF_PID=$!
+            sleep 5
+
+            trap "kill $PF_PID 2>/dev/null || true" EXIT
+
+            # Check targets
+            TARGETS=$(curl -s http://localhost:9090/api/v1/targets)
+
+            echo "=== Checking Prometheus Targets ==="
+
+            # Check if we have any active targets
+            ACTIVE=$(echo "$TARGETS" | grep -o '"state":"up"' | wc -l)
+            echo "Total active targets: $ACTIVE"
+
+            if [ "$ACTIVE" -eq 0 ]; then
+              echo "WARNING: No active targets found"
+            fi
+
+            # Check for HiveMetastore targets
+            echo "Looking for HiveMetastore targets..."
+
+            if echo "$TARGETS" | grep -q "test-hive-observability"; then
+              echo "✓ Found HiveMetastore target"
+
+              # Verify target is UP
+              if echo "$TARGETS" | grep "test-hive-observability" | grep -q '"health":"up"'; then
+                echo "✓ HiveMetastore target is UP"
+              else
+                echo "WARNING: HiveMetastore target found but not UP"
+                echo "$TARGETS" | grep "test-hive-observability" | head -20
+              fi
+            else
+              echo "ERROR: HiveMetastore target not found in Prometheus"
+              echo "Available targets:"
+              echo "$TARGETS" | grep -o '"job":"[^"]*"' | sort | uniq
+              exit 1
+            fi
+
+            echo "✓ Prometheus targets verification complete"
