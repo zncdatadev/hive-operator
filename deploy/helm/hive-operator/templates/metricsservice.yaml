@@ -1,0 +1,21 @@
+{{- if .Values.metrics.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "operator.fullname" . }}-metrics
+  labels:
+    {{- include "operator.labels" . | nindent 4 }}
+  {{- with .Values.metrics.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.metrics.service.type }}
+  ports:
+    - name: {{ include "operator.metricsPortName" . }}
+      port: {{ include "operator.metricsPort" . }}
+      protocol: TCP
+      targetPort: {{ include "operator.metricsPort" . }}
+  selector:
+    {{- include "operator.selectorLabels" . | nindent 4 }}
+{{- end }}

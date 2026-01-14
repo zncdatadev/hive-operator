@@ -2,18 +2,24 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# This will set the replicaset count more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
 replicaCount: 1
 
+# This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 image:
   repository: quay.io/zncdatadev/hive-operator
+  # This sets the pull policy for images.
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
 
+# This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
+# This is to override the chart name.
 nameOverride: ""
 fullnameOverride: ""
 
+# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
@@ -25,7 +31,11 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
+# This is for setting Kubernetes Annotations to a Pod.
+# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
 podAnnotations: {}
+# This is for setting Kubernetes Labels to a Pod.
+# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 podLabels: {}
 
 podSecurityContext: {}
@@ -39,23 +49,66 @@ securityContext: {}
   # runAsNonRoot: true
   # runAsUser: 1000
 
+# We usually recommend not to specify default resources and to leave this as a conscious
+# choice for the user. This also increases chances charts run on environments with little
+# resources, such as Minikube. If you do want to specify resources, uncomment the following
+# lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+## resources:
+##   limits:
+##     cpu: 100m
+##     memory: 128Mi
+##   requests:
+##     cpu: 100m
+##     memory: 128Mi
 resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
 
 nodeSelector: {}
 
 tolerations: []
 
 affinity: {}
-maintainers:
-  - email: zncdatadev@googlegroups.com
-    name: ZNCDataDev Team
+
+# Metrics service configuration
+metrics:
+  # Enable metrics service
+  enabled: true
+  # Use HTTPS for metrics (if false, will use HTTP)
+  # When secure is true, the default port is 8443 (HTTPS)
+  # When secure is false, the default port is 8080 (HTTP)
+  secure: false
+  # Service configuration
+  service:
+    # Service port (will default to 8443 for HTTPS, 8080 for HTTP if not specified)
+    # port: # Auto-select based on secure setting
+    # Service type
+    type: ClusterIP
+    # Service annotations
+    annotations: {}
+
+# Health probe configuration
+healthProbe:
+  # Health probe bind address
+  bindAddress: ":8081"
+
+# ServiceMonitor configuration for Prometheus Operator
+serviceMonitor:
+  # Enable ServiceMonitor (requires Prometheus Operator CRDs to be installed in the cluster)
+  # WARNING: If Prometheus Operator is not installed, enabling this will cause chart installation to fail.
+  # Set to true only if you have Prometheus Operator installed.
+  enabled: false
+  # Additional labels for ServiceMonitor
+  # Example: to make it discoverable by a specific Prometheus instance
+  # additionalLabels:
+  #   prometheus: kube-prometheus
+  additionalLabels: {}
+  # Scrape interval
+  interval: 30s
+  # Scrape timeout
+  scrapeTimeout: 10s
+  # Metrics path
+  path: /metrics
+  # TLS configuration (only used when metrics.secure is true)
+  tlsConfig:
+    # Skip TLS verification (set to true only in non-production environments)
+    # For production, use cert-manager to manage certificates and set this to false
+    insecureSkipVerify: false
