@@ -40,8 +40,9 @@ cover.out
 *__debug*
 **/coverage
 
-# ai code local
+# ai coding
 .codiumai.toml
+.omc
 
 # helm charts
 # helm package directory
