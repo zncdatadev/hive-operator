@@ -131,7 +131,7 @@ func (b *ConfigMapBuilder) addHiveSite(s3Connection *S3Connection) error {
 func (b *ConfigMapBuilder) addCoreSite() error {
 	if b.ClusterConfig.Authentication != nil {
 		config := xml.NewXMLConfiguration()
-		config.AddPropertyWithString("hadoop.security.authentication", "kerberos", "")
+		config.AddPropertyWithString("hadoop.security.authentication", kerberosAuthType, "")
 		s, err := config.Marshal()
 		if err != nil {
 			return err

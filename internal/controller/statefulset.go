@@ -209,13 +209,13 @@ func (b *StatefulSetBuilder) getJVMOpts(
 	}
 
 	for _, env := range envs {
-		if env.Name == "HADOOP_OPTS" {
+		if env.Name == hadoopOptsEnvName {
 			jvmOpt = append(jvmOpt, env.Value)
 		}
 	}
 
 	return corev1.EnvVar{
-		Name:  "HADOOP_OPTS",
+		Name:  hadoopOptsEnvName,
 		Value: strings.Join(jvmOpt, " "),
 	}
 }
@@ -277,7 +277,7 @@ func (b *StatefulSetBuilder) getMainContainerEnv(krb5Config *KerberosConfig) []c
 	if krb5Config != nil {
 		krb5Envs := krb5Config.GetEnv()
 		for _, e := range krb5Envs {
-			if e.Name == "HADOOP_OPTS" {
+			if e.Name == hadoopOptsEnvName {
 				jvmEnvs = append(jvmEnvs, e)
 			} else {
 				env = append(env, e)

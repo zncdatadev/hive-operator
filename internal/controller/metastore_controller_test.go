@@ -18,12 +18,14 @@ var _ = Describe("HiveMetastore controller", func() {
 
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-hivemetastore"
+		const testNamespace = "default"
+		const testRoleGroupName = "default"
 
 		ctx := context.Background()
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default",
+			Namespace: testNamespace,
 		}
 		hiveMetastore := &hivev1alpha1.HiveMetastore{}
 
@@ -34,7 +36,7 @@ var _ = Describe("HiveMetastore controller", func() {
 				resource := &hivev1alpha1.HiveMetastore{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
-						Namespace: "default",
+						Namespace: testNamespace,
 					},
 					Spec: hivev1alpha1.HiveMetastoreSpec{
 						ClusterConfig: &hivev1alpha1.ClusterConfigSpec{
@@ -42,7 +44,7 @@ var _ = Describe("HiveMetastore controller", func() {
 						},
 						Metastore: &hivev1alpha1.RoleSpec{
 							RoleGroups: map[string]*hivev1alpha1.RoleGroupSpec{
-								"default": {
+								testRoleGroupName: {
 									Replicas: 1,
 								},
 							},
