@@ -12,6 +12,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	kerberosVolumeName = "kerberos"
+	kerberosAuthType   = "kerberos"
+	hadoopOptsEnvName  = "HADOOP_OPTS"
+)
+
 var (
 	Krb5ConfigFile = path.Join(constants.KubedoopKerberosDir, "krb5.conf")
 )
@@ -55,7 +61,7 @@ func (c *KerberosConfig) getPrincipal(service string) string {
 
 func (c *KerberosConfig) GetCoreSite() map[string]string {
 	return map[string]string{
-		"hadoop.security.authentication": "kerberos",
+		"hadoop.security.authentication": kerberosAuthType,
 	}
 }
 
@@ -66,7 +72,7 @@ func (c *KerberosConfig) GetEnv() []corev1.EnvVar {
 			Value: Krb5ConfigFile,
 		},
 		{
-			Name:  "HADOOP_OPTS",
+			Name:  hadoopOptsEnvName,
 			Value: fmt.Sprintf("-Djava.security.krb5.conf=%s/krb5.conf -Dhive.root.logger=console", constants.KubedoopKerberosDir),
 		},
 	}
@@ -75,7 +81,7 @@ func (c *KerberosConfig) GetEnv() []corev1.EnvVar {
 func (c *KerberosConfig) GetVolumes() []corev1.Volume {
 	return []corev1.Volume{
 		{
-			Name: "kerberos",
+			Name: kerberosVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				Ephemeral: &corev1.EphemeralVolumeSource{
 					VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
@@ -105,7 +111,7 @@ func (c *KerberosConfig) GetVolumes() []corev1.Volume {
 func (c *KerberosConfig) GetVolumeMounts() []corev1.VolumeMount {
 	return []corev1.VolumeMount{
 		{
-			Name:      "kerberos",
+			Name:      kerberosVolumeName,
 			MountPath: constants.KubedoopKerberosDir,
 		},
 	}
