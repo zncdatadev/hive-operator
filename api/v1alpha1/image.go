@@ -6,7 +6,7 @@ import (
 
 const (
 	DefaultRepository     = "quay.io/zncdatadev"
-	DefaultProductVersion = "3.1.3"
+	DefaultProductVersion = "4.0.1"
 	DefaultProductName    = "hive"
 )
 

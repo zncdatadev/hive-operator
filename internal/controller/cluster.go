@@ -35,10 +35,15 @@ func NewClusterReconciler(
 }
 
 func (r *ClusterReconciler) GetImage() *util.Image {
+	productVersion := r.Spec.Image.ProductVersion
+	if productVersion == "" {
+		productVersion = hivev1alpha1.DefaultProductVersion
+	}
+
 	image := util.NewImage(
 		hivev1alpha1.DefaultProductName,
 		version.BuildVersion,
-		hivev1alpha1.DefaultProductVersion,
+		productVersion,
 		func(options *util.ImageOptions) {
 			options.Custom = r.Spec.Image.Custom
 			options.Repo = r.Spec.Image.Repo
