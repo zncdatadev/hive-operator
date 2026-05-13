@@ -328,7 +328,7 @@ jobs:
 
           # E2E tests
           make chainsaw
-          ./bin/chainsaw test --test-dir ./test/e2e/
+          ./bin/chainsaw test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/
 
 
   release-chart:
@@ -351,7 +351,7 @@ jobs:
 
       - name: Build and push oci chart
         run: |
-          make chart-publish
+          make helm-chart-publish
 
       - name: Clone helm charts repository
         uses: actions/checkout@v6
