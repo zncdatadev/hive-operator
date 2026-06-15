@@ -179,7 +179,7 @@ jobs:
         run: ah lint
 
 
-  chart-lint-test:
+  chart-lint-helm:
     runs-on: ubuntu-latest
     needs:
       - check-crds-sync
@@ -209,8 +209,16 @@ jobs:
         id: commit-range
         run: |
           # Get current and previous tag
+          # Exclude -dev pre-release tags only when looking for the previous tag,
+          # not when matching the current tag itself
           CURRENT_TAG="${{ github.ref_name }}"
-          PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -A1 "^${CURRENT_TAG}$" | tail -n1)
+          PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -A1 "^${CURRENT_TAG}$" | tail -n1 | grep -v '\-dev$')
+
+          # If the -dev tag itself was the only match (no previous stable tag found),
+          # try again excluding -dev to find the actual previous stable release
+          if [[ -z "$PREVIOUS_TAG" ]]; then
+            PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -v '\-dev$' | grep -A1 "^${CURRENT_TAG}$" | tail -n1)
+          fi
 
           # First release detection
           if [[ "$PREVIOUS_TAG" == "$CURRENT_TAG" || -z "$PREVIOUS_TAG" ]]; then
@@ -282,53 +290,45 @@ jobs:
       - name: Create kind cluster
         if: steps.check-changes.outputs.changed == 'true'
         uses: helm/kind-action@v1.14.0
+
+      - name: Setup Go
+        if: steps.check-changes.outputs.changed == 'true'
+        uses: actions/setup-go@v6
         with:
-          cluster_name: kind  # Default cluster name is 'chart-testing'
+          go-version-file: go.mod
+
+      - name: Build image
+        if: steps.check-changes.outputs.changed == 'true'
+        run: make docker-build
 
       - name: Load images to cluster
         if: steps.check-changes.outputs.changed == 'true'
-        run: |
-          make docker-build
-          kind load docker-image quay.io/zncdatadev/hive-operator:$VERSION
+        run: kind load docker-image --name chart-testing quay.io/zncdatadev/hive-operator:$VERSION
 
       - name: Run chart-testing (install)
-        id: ct-test
         if: steps.check-changes.outputs.changed == 'true'
         run: |
           ct install \
             --since "${{ steps.commit-range.outputs.since_commit }}" \
             --target-branch "${{ steps.commit-range.outputs.target_branch }}" \
             --config ./.github/configs/ct-install.yaml
-          # Save success result to github output
-          if [[ $? -eq 0 ]]; then
-            echo "ct_tested=true" >> "$GITHUB_OUTPUT"
-          fi
 
-      - name: Build helm chart
-        if: steps.ct-test.outputs.ct_tested == 'true'
-        run: |
-          make helm-chart-package
 
-      - name: Run e2e with chart
-        if: steps.ct-test.outputs.ct_tested == 'true'
-        run: |
-          HELM_DEPENDENCIES=(
-            commons-operator
-            listener-operator
-            secret-operator
-          )
+  chart-e2e:
+    runs-on: ubuntu-latest
+    needs:
+      - check-crds-sync
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v6
 
-          # Install dependencies
-          for dep in "${HELM_DEPENDENCIES[@]}"; do
-            helm upgrade --install --create-namespace --namespace kubedoop-operators --wait $dep oci://quay.io/kubedoopcharts/$dep --version $VERSION
-          done
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
 
-          # Install packaged operator chart
-          helm install --create-namespace --namespace hive-operators --wait hive-operator ./target/charts/hive-operator-$VERSION.tgz
-
-          # E2E tests
-          make chainsaw
-          ./bin/chainsaw test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/
+      - name: Run chart-e2e
+        run: make chart-e2e
 
 
   release-chart:
@@ -337,7 +337,8 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - chart-linter-artifacthub
-      - chart-lint-test
+      - chart-lint-helm
+      - chart-e2e
     steps:
       - name: Clone the code
         uses: actions/checkout@v6
@@ -394,6 +395,12 @@ jobs:
           if [ -z "$CHART_NAME" ] || [ -z "$CHART_VERSION" ]; then
             echo "Failed to extract CHART_NAME or CHART_VERSION from package filename: $CHART_PACKAGE"
             exit 1
+          fi
+
+          # Skip -dev pre-release tags from index
+          if echo "$CHART_VERSION" | grep -q '\-dev$'; then
+            echo "Skipping -dev pre-release tag: $CHART_VERSION"
+            exit 0
           fi
 
           # Regenerate the index.yaml file for the helm charts repository
