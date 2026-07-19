@@ -27,8 +27,11 @@ jobs:
         run: |
           # Use `make manifests` to generate the CRDs
           make manifests
-          # Check if the CRDs are in sync with the manifests
-          if ! git diff --exit-code; then
+          # Check if the CRDs are in sync with the manifests.
+          # Stage everything first so newly generated (untracked) files are
+          # detected too; plain `git diff` ignores untracked files.
+          git add -A
+          if ! git diff --cached --exit-code; then
             echo "CRDs are not in sync with the manifests."
             echo "Please run 'make manifests' to update the CRDs."
             exit 1
