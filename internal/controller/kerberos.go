@@ -3,13 +3,10 @@ package controller
 import (
 	"fmt"
 	"path"
-	"strings"
 
-	"github.com/zncdatadev/operator-go/pkg/constants"
-	"github.com/zncdatadev/operator-go/pkg/util"
+	"github.com/zncdatadev/operator-go/pkg/constant"
+	"github.com/zncdatadev/operator-go/pkg/security"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -18,9 +15,7 @@ const (
 	hadoopOptsEnvName  = "HADOOP_OPTS"
 )
 
-var (
-	Krb5ConfigFile = path.Join(constants.KubedoopKerberosDir, "krb5.conf")
-)
+var Krb5ConfigFile = path.Join(constant.KubedoopKerberosDir, "krb5.conf")
 
 type KerberosConfig struct {
 	Namespace   string
@@ -28,19 +23,18 @@ type KerberosConfig struct {
 	RoleName    string
 
 	KerberosSecretClass string
-	HdfsEnabled         bool
 }
 
 func NewKerberosConfig(
 	namespace string,
-	clustername string,
-	rolename string,
+	clusterName string,
+	roleName string,
 	krb5SecretClass string,
 ) *KerberosConfig {
 	return &KerberosConfig{
 		Namespace:           namespace,
-		ClusterName:         clustername,
-		RoleName:            rolename,
+		ClusterName:         clusterName,
+		RoleName:            roleName,
 		KerberosSecretClass: krb5SecretClass,
 	}
 }
@@ -50,10 +44,13 @@ func (c *KerberosConfig) GetHiveSite() map[string]string {
 		"hive.metastore.sasl.enabled":              "true",
 		"hive.metastore.kerberos.principal":        c.getPrincipal(c.RoleName),
 		"hive.metastore.client.kerberos.principal": c.getPrincipal(c.RoleName),
-		"hive.metastore.kerberos.keytab.file":      path.Join(constants.KubedoopKerberosDir, "keytab"),
+		"hive.metastore.kerberos.keytab.file":      path.Join(constant.KubedoopKerberosDir, "keytab"),
 	}
 }
 
+// getPrincipal renders the service principal with a ${env.KERBEROS_REALM} placeholder that the
+// container start script substitutes at runtime (the realm is only known once the keytab volume
+// is mounted; see GetContainerCommandArgs).
 func (c *KerberosConfig) getPrincipal(service string) string {
 	host := fmt.Sprintf("%s.%s.svc.cluster.local", c.ClusterName, c.Namespace)
 	return fmt.Sprintf("%s/%s@${env.KERBEROS_REALM}", service, host)
@@ -73,62 +70,29 @@ func (c *KerberosConfig) GetEnv() []corev1.EnvVar {
 		},
 		{
 			Name:  hadoopOptsEnvName,
-			Value: fmt.Sprintf("-Djava.security.krb5.conf=%s/krb5.conf -Dhive.root.logger=console", constants.KubedoopKerberosDir),
+			Value: fmt.Sprintf("-Djava.security.krb5.conf=%s -Dhive.root.logger=console", Krb5ConfigFile),
 		},
 	}
 }
 
-func (c *KerberosConfig) GetVolumes() []corev1.Volume {
-	return []corev1.Volume{
-		{
-			Name: kerberosVolumeName,
-			VolumeSource: corev1.VolumeSource{
-				Ephemeral: &corev1.EphemeralVolumeSource{
-					VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								constants.AnnotationSecretsClass:                c.KerberosSecretClass,
-								constants.AnnotationSecretsScope:                fmt.Sprintf("service=%s", c.ClusterName),
-								constants.AnnotationSecretsKerberosServiceNames: strings.Join([]string{c.RoleName, "HTTP"}, constants.CommonDelimiter),
-							},
-						},
-						Spec: corev1.PersistentVolumeClaimSpec{
-							StorageClassName: constants.SecretStorageClassPtr(),
-							AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-							Resources: corev1.VolumeResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceStorage: resource.MustParse("1Mi"),
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
+// Provisioner declares the Kerberos keytab CSI volume. The keytab is scoped to the cluster's
+// service address (scope "service=<cluster>") and covers the "<role>" and "HTTP" service names,
+// matching the principals rendered into hive-site.xml.
+func (c *KerberosConfig) Provisioner() *security.SecretProvisioner {
+	return security.NewSecretProvisioner().
+		// KubedoopKerberosDir is "<root>/kerberos/": mounting volume "kerberos" under the
+		// kubedoop root reproduces it exactly.
+		WithMountBasePath(constant.KubedoopRoot).
+		Register(
+			security.KerberosVolume(kerberosVolumeName, c.KerberosSecretClass, c.RoleName, "HTTP").
+				WithScope("service=" + c.ClusterName).
+				WithStorageSize("1Mi"),
+		)
 }
 
-func (c *KerberosConfig) GetVolumeMounts() []corev1.VolumeMount {
-	return []corev1.VolumeMount{
-		{
-			Name:      kerberosVolumeName,
-			MountPath: constants.KubedoopKerberosDir,
-		},
-	}
-}
-
+// GetContainerCommandArgs resolves the Kerberos realm from the mounted krb5.conf and substitutes
+// the ${env.KERBEROS_REALM} placeholder in the copied (writable) hive-site.xml.
 func (c *KerberosConfig) GetContainerCommandArgs() string {
-	cmds := `
-export KERBEROS_REALM=$(grep -oP 'default_realm = \K.*' ` + Krb5ConfigFile + `)
-sed -i -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g"  ` + path.Join(constants.KubedoopConfigDir, "hive-site.xml") + `
-`
-
-	if c.HdfsEnabled {
-		cmds += `
-sed -i -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g"  ` + path.Join(constants.KubedoopConfigDir, "core-site.xml") + `
-sed -i -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g"  ` + path.Join(constants.KubedoopConfigDir, "hdfs-site.xml") + `
-`
-	}
-
-	return util.IndentTab4Spaces(cmds)
+	return `export KERBEROS_REALM=$(grep -oP 'default_realm = \K.*' ` + Krb5ConfigFile + `)
+sed -i -e 's/${env.KERBEROS_REALM}/'"$KERBEROS_REALM/g" ` + path.Join(constant.KubedoopConfigDir, HiveSiteFileName)
 }
