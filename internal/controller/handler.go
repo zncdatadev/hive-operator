@@ -118,6 +118,14 @@ func (h *HiveRoleGroupHandler) BuildResources(
 		h.ImagePullPolicy = cr.Spec.Image.PullPolicy
 	}
 
+	// The GenericReconciler only propagates the product image to registered sidecars (Vector)
+	// for handlers that ARE *BaseRoleGroupHandler; embedding handlers must do it themselves.
+	if buildCtx.SidecarManager != nil {
+		if err := buildCtx.SidecarManager.SetProductImage(h.Image, h.ImagePullPolicy); err != nil {
+			return nil, fmt.Errorf("failed to set product image on sidecars: %w", err)
+		}
+	}
+
 	var s3Config *S3Config
 	if clusterConfig != nil && clusterConfig.S3 != nil {
 		s3Connection, err := GetS3Connection(ctx, k8sClient, cr.GetNamespace(), clusterConfig.S3)
