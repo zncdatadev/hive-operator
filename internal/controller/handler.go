@@ -112,18 +112,11 @@ func (h *HiveRoleGroupHandler) BuildResources(
 ) (*reconciler.RoleGroupResources, error) {
 	clusterConfig := cr.Spec.ClusterConfig
 
-	// Resolve the CR-driven image before the framework builds the StatefulSet.
+	// Resolve the CR-driven image before delegating to the framework: the base BuildResources
+	// propagates it to the StatefulSet and the registered sidecars (Vector).
 	h.Image = resolveImage(cr.Spec.Image)
 	if cr.Spec.Image != nil && cr.Spec.Image.PullPolicy != "" {
 		h.ImagePullPolicy = cr.Spec.Image.PullPolicy
-	}
-
-	// The GenericReconciler only propagates the product image to registered sidecars (Vector)
-	// for handlers that ARE *BaseRoleGroupHandler; embedding handlers must do it themselves.
-	if buildCtx.SidecarManager != nil {
-		if err := buildCtx.SidecarManager.SetProductImage(h.Image, h.ImagePullPolicy); err != nil {
-			return nil, fmt.Errorf("failed to set product image on sidecars: %w", err)
-		}
 	}
 
 	var s3Config *S3Config
