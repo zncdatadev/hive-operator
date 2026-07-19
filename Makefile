@@ -291,13 +291,9 @@ helm-chart-publish: helm-chart-package ## Publish helm chart for the operator.
 ##@ Chainsaw E2E
 
 CHAINSAW ?= $(LOCALBIN)/chainsaw
-CHAINSAW_VERSION ?= v0.2.13
+CHAINSAW_VERSION ?= v0.2.15
 CHAINSAW_CLUSTER ?= chainsaw-${PROJECT_NAME}
 CHAINSAW_KUBECONFIG ?= .kubeconfig
-# Chainsaw only resolves ($values.*) bindings from files passed via --values,
-# so the product version selected by the CI matrix must be written to a values
-# file before running the tests. See the chainsaw-values target.
-CHAINSAW_VALUES ?= test/e2e/.values.yaml
 # KIND_K8S_VERSION refers to the version of Kubernetes to be used by kind node image.
 # The version only effects e2e tests.
 # When run `kind create --image kindest/node:v${KIND_K8S_VERSION}`, the node image version of k8s will be used to create the kind cluster,
@@ -344,20 +340,16 @@ setup-chainsaw-e2e: chainsaw docker-build ## Run the chainsaw setup
 
 
 .PHONY: chart-e2e
-chart-e2e: setup-chainsaw-cluster chainsaw docker-build helm-chart-package chainsaw-values ## Run e2e tests with Helm chart deployment
+chart-e2e: setup-chainsaw-cluster chainsaw docker-build helm-chart-package ## Run e2e tests with Helm chart deployment
 	"$(KIND)" --name $(CHAINSAW_CLUSTER) load docker-image "$(IMG)"
 	"$(HELM)" upgrade --install --create-namespace --namespace $(PROJECT_NAME) \
 		--kubeconfig $(CHAINSAW_KUBECONFIG) --wait $(PROJECT_NAME) \
 		target/charts/$(PROJECT_NAME)-$(VERSION).tgz
-	KUBECONFIG=$(CHAINSAW_KUBECONFIG) $(CHAINSAW) test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/ --values $(CHAINSAW_VALUES)
-
-.PHONY: chainsaw-values
-chainsaw-values: ## Generate the chainsaw values file from PRODUCT_VERSION. When unset, null lets the operator default apply.
-	@echo "product_version: $${PRODUCT_VERSION:-null}" > $(CHAINSAW_VALUES)
+	KUBECONFIG=$(CHAINSAW_KUBECONFIG) $(CHAINSAW) test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/ --set product_version=$(PRODUCT_VERSION)
 
 .PHONY: chainsaw-e2e
-chainsaw-e2e: chainsaw-values ## Run the chainsaw e2e tests
-	KUBECONFIG=$(CHAINSAW_KUBECONFIG) $(CHAINSAW) test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/ --values $(CHAINSAW_VALUES)
+chainsaw-e2e: ## Run the chainsaw e2e tests
+	KUBECONFIG=$(CHAINSAW_KUBECONFIG) $(CHAINSAW) test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/ --set product_version=$(PRODUCT_VERSION)
 
 .PHONY: cleanup-chainsaw-e2e
 cleanup-chainsaw-e2e: ## Run the chainsaw cleanup
