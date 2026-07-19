@@ -291,7 +291,7 @@ helm-chart-publish: helm-chart-package ## Publish helm chart for the operator.
 ##@ Chainsaw E2E
 
 CHAINSAW ?= $(LOCALBIN)/chainsaw
-CHAINSAW_VERSION ?= v0.2.15
+CHAINSAW_VERSION ?= v0.2.14
 CHAINSAW_CLUSTER ?= chainsaw-${PROJECT_NAME}
 CHAINSAW_KUBECONFIG ?= .kubeconfig
 # KIND_K8S_VERSION refers to the version of Kubernetes to be used by kind node image.
