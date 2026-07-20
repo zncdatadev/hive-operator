@@ -62,7 +62,7 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@v5
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
           check-latest: true
@@ -119,7 +119,7 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@v5
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
           check-latest: true
