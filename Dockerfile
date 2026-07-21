@@ -8,10 +8,9 @@ WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
-# TEMPORARY (local operator-go iteration): build from the vendor tree because go.mod replaces
-# operator-go with ../operator-go, which is outside the build context. Run `go mod vendor`
-# before building. Revert to `RUN go mod download` once the replace is dropped.
-COPY vendor/ vendor/
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN go mod download
 
 # Copy the go source
 COPY cmd/main.go cmd/main.go
