@@ -2,19 +2,21 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
 
 	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
-	"github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
-	"github.com/zncdatadev/operator-go/pkg/client"
-	"github.com/zncdatadev/operator-go/pkg/constants"
-	"github.com/zncdatadev/operator-go/pkg/util"
+	s3v1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
+	"github.com/zncdatadev/operator-go/pkg/constant"
+	"github.com/zncdatadev/operator-go/pkg/security"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
 )
@@ -26,25 +28,33 @@ const (
 	S3VolumeName = "s3-credentials"
 )
 
-// TODO: Add the tls verification
 type S3Connection struct {
 	Endpoint   url.URL
 	PathStyle  bool
 	credential *commonsv1alpha1.Credentials
 }
 
-func GetS3Connect(ctx context.Context, client *client.Client, s3 *hivev1alpha1.S3Spec) (*S3Connection, error) {
+// GetS3Connection resolves the CR's S3 configuration to a connection, either from the inline
+// spec or by fetching the referenced S3Connection object from the CR's namespace.
+func GetS3Connection(ctx context.Context, client ctrlclient.Client, namespace string, s3 *hivev1alpha1.S3Spec) (*S3Connection, error) {
 	s3ConnectionSpec := s3.Inline
 	if s3.Reference != "" {
-		obj, err := GetRefreenceS3Connection(ctx, client, s3.Reference)
-		if err != nil {
-			return nil, err
+		s3Connection := &s3v1alpha1.S3Connection{}
+		if err := client.Get(ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: s3.Reference}, s3Connection); err != nil {
+			return nil, fmt.Errorf("failed to get referenced S3Connection %q: %w", s3.Reference, err)
 		}
-		s3ConnectionSpec = &obj.Spec
+		s3ConnectionSpec = &s3Connection.Spec
+	}
+	if s3ConnectionSpec == nil {
+		return nil, fmt.Errorf("s3 is configured but neither inline nor reference connection is set")
 	}
 
+	scheme := "http"
+	if s3ConnectionSpec.Tls != nil {
+		scheme = "https"
+	}
 	endpoint := url.URL{
-		Scheme: "http",
+		Scheme: scheme,
 		Host:   s3ConnectionSpec.Host,
 	}
 	if s3ConnectionSpec.Port != 0 {
@@ -58,30 +68,16 @@ func GetS3Connect(ctx context.Context, client *client.Client, s3 *hivev1alpha1.S
 	}, nil
 }
 
-func GetRefreenceS3Connection(ctx context.Context, client *client.Client, name string) (*v1alpha1.S3Connection, error) {
-	s3Connection := &v1alpha1.S3Connection{}
-	if err := client.GetWithOwnerNamespace(ctx, name, s3Connection); err != nil {
-		return nil, err
-	}
-	return s3Connection, nil
-}
-
 type S3Config struct {
 	S3Connection *S3Connection
 }
 
-func NewS3Config(
-	s3Connection *S3Connection,
-) *S3Config {
+func NewS3Config(s3Connection *S3Connection) *S3Config {
 	return &S3Config{S3Connection: s3Connection}
 }
 
 func (s *S3Config) GetMountPath() string {
-	return path.Join(constants.KubedoopSecretDir, "s3-credentials")
-}
-
-func (s *S3Config) GetVolumeName() string {
-	return S3VolumeName
+	return path.Join(constant.KubedoopSecretDir, S3VolumeName)
 }
 
 func (s *S3Config) GetEndpoint() string {
@@ -89,55 +85,61 @@ func (s *S3Config) GetEndpoint() string {
 }
 
 func (s *S3Config) GetHiveSite() map[string]string {
-
 	sslEnabled := s.S3Connection.Endpoint.Scheme == "https"
 
-	properties := map[string]string{
-		"fs.s3a.endpoint":                s.GetEndpoint(),
+	return map[string]string{
+		"fs.s3a.endpoint": s.GetEndpoint(),
+		// Path-style access is intentionally always on: most self-hosted S3 backends (MinIO)
+		// require it, and the CRD's pathStyle default (false) predates any consumer of the
+		// virtual-host style. Honoring spec.pathStyle is deferred to the operator-go S3
+		// rendering helper.
 		"fs.s3a.path.style.access":       "true",
 		"fs.s3a.connection.ssl.enabled":  strconv.FormatBool(sslEnabled),
 		"fs.s3a.impl":                    "org.apache.hadoop.fs.s3a.S3AFileSystem",
 		"fs.AbstractFileSystem.s3a.impl": "org.apache.hadoop.fs.s3a.S3A",
 	}
-	return properties
 }
 
-func (s *S3Config) GetVolumes() []corev1.Volume {
-
+// Volumes implements reconciler.VolumeProvider: the S3 credentials are delivered by
+// secret-operator through an ephemeral CSI volume annotated with the secret class and scope.
+// The volume is hand-built (not via security.SecretProvisioner) because plain credential
+// secrets carry no format annotation, which the provisioner cannot express yet.
+func (s *S3Config) Volumes() []corev1.Volume {
 	credential := s.S3Connection.credential
 
-	secretClass := credential.SecretClass
-
 	annotations := map[string]string{
-		constants.AnnotationSecretsClass: secretClass,
+		security.SecretClassAnnotation: credential.SecretClass,
 	}
 
 	if credential.Scope != nil {
 		scopes := []string{}
 		if credential.Scope.Node {
-			scopes = append(scopes, string(constants.NodeScope))
+			scopes = append(scopes, string(security.NodeScope))
 		}
 		if credential.Scope.Pod {
-			scopes = append(scopes, string(constants.PodScope))
+			scopes = append(scopes, string(security.PodScope))
 		}
 		scopes = append(scopes, credential.Scope.Services...)
 
-		annotations[constants.AnnotationSecretsScope] = strings.Join(scopes, constants.CommonDelimiter)
+		annotations[security.SecretClassScopeAnnotation] = strings.Join(scopes, security.CommonDelimiter)
 	}
-	secretVolume := corev1.Volume{
-		Name: s.GetVolumeName(),
-		VolumeSource: corev1.VolumeSource{
-			Ephemeral: &corev1.EphemeralVolumeSource{
-				VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: annotations,
-					},
-					Spec: corev1.PersistentVolumeClaimSpec{
-						AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						StorageClassName: constants.SecretStorageClassPtr(),
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("1Mi"),
+
+	return []corev1.Volume{
+		{
+			Name: S3VolumeName,
+			VolumeSource: corev1.VolumeSource{
+				Ephemeral: &corev1.EphemeralVolumeSource{
+					VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: annotations,
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							StorageClassName: ptr.To(string(security.SecretStorageClass)),
+							Resources: corev1.VolumeResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: resource.MustParse("1Mi"),
+								},
 							},
 						},
 					},
@@ -145,23 +147,21 @@ func (s *S3Config) GetVolumes() []corev1.Volume {
 			},
 		},
 	}
-	return []corev1.Volume{secretVolume}
 }
 
-func (s *S3Config) GetVolumeMounts() []corev1.VolumeMount {
-	secretVolumeMount := &corev1.VolumeMount{
-		Name:      s.GetVolumeName(),
-		MountPath: s.GetMountPath(),
+// VolumeMounts implements reconciler.VolumeProvider.
+func (s *S3Config) VolumeMounts() []corev1.VolumeMount {
+	return []corev1.VolumeMount{
+		{
+			Name:      S3VolumeName,
+			MountPath: s.GetMountPath(),
+		},
 	}
-
-	return []corev1.VolumeMount{*secretVolumeMount}
 }
 
+// GetContainerCommandArgs exports the mounted S3 credentials as AWS SDK environment variables
+// before the metastore starts.
 func (s *S3Config) GetContainerCommandArgs() string {
-	args := `
-export AWS_ACCESS_KEY_ID=$(cat ` + path.Join(s.GetMountPath(), S3AccessKeyName) + `)
-export AWS_SECRET_ACCESS_KEY=$(cat ` + path.Join(s.GetMountPath(), S3SecretKeyName) + `)
-`
-
-	return util.IndentTab4Spaces(args)
+	return `export AWS_ACCESS_KEY_ID=$(cat ` + path.Join(s.GetMountPath(), S3AccessKeyName) + `)
+export AWS_SECRET_ACCESS_KEY=$(cat ` + path.Join(s.GetMountPath(), S3SecretKeyName) + `)`
 }

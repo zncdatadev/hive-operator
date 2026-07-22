@@ -39,6 +39,7 @@ import (
 	"github.com/zncdatadev/hive-operator/internal/controller"
 	"github.com/zncdatadev/hive-operator/internal/util/version"
 	s3v1alph1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
+	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	// +kubebuilder:scaffold:imports
 )
@@ -93,7 +94,7 @@ func main() {
 	flag.Parse()
 
 	if showVersion {
-		importedVersion := version.NewAppInfo("zookeeper-operator").String()
+		importedVersion := version.NewAppInfo("hive-operator").String()
 		fmt.Println(importedVersion)
 		os.Exit(0)
 	}
@@ -191,10 +192,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.HiveMetastoreReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	hiveHandler := controller.NewHiveRoleGroupHandler(mgr.GetScheme())
+	hiveReconciler, err := reconciler.NewGenericReconciler(
+		&reconciler.GenericReconcilerConfig[*hivev1alpha1.HiveMetastore]{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+			// operator-go's Recorder field is the (deprecated) record.EventRecorder; the
+			// replacement GetEventRecorder returns the incompatible events.EventRecorder.
+			Recorder:         mgr.GetEventRecorderFor("hive-metastore-controller"), //nolint:staticcheck
+			RoleGroupHandler: hiveHandler,
+			// Per-CR ServiceAccount naming so multiple clusters in one namespace never fight
+			// over a shared ServiceAccount.
+			ServiceAccountNameFunc: func(cr *hivev1alpha1.HiveMetastore) string {
+				return hivev1alpha1.DefaultProductName + "-" + cr.GetName()
+			},
+			Prototype: &hivev1alpha1.HiveMetastore{},
+		})
+	if err != nil {
+		setupLog.Error(err, "unable to create reconciler", "controller", "HiveMetastore")
+		os.Exit(1)
+	}
+	if err = hiveReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HiveMetastore")
 		os.Exit(1)
 	}
