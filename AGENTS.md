@@ -35,7 +35,7 @@ Manages Apache Hive deployments on Kubernetes. Handles creation, configuration, 
 - Run `make test` for unit tests
 - Run `make generate && make manifests` after modifying API types
 - Run `make deploy` to deploy to a cluster (requires kubeconfig)
-- Worktrees are stored under `../.hive-operator-worktrees/`
+- Worktrees are stored under `.worktree/` (see [AI Worktree Development Mode](#ai-worktree-development-mode))
 
 ### Testing Requirements
 - Unit tests: `make test` (uses envtest)
@@ -57,5 +57,23 @@ Manages Apache Hive deployments on Kubernetes. Handles creation, configuration, 
 - `sigs.k8s.io/controller-runtime v0.23+`
 - `k8s.io/api`, `k8s.io/apimachinery`, `k8s.io/client-go v0.35+`
 - Kubernetes 1.26+
+
+### AI Worktree Development Mode
+
+**IMPORTANT**: When making code changes, work in a worktree under `.worktree/`, NOT in the main working directory.
+
+#### Workflow
+1. Create worktree: `git worktree add .worktree/<branch-name> -b <branch-name>`
+2. Work in `.worktree/<branch-name>/` directory
+3. Test: `cd .worktree/<branch-name> && make lint && make test`
+4. Commit changes in the worktree
+5. Push and create PR from the worktree branch
+6. Cleanup: `git worktree remove .worktree/<branch-name>`
+
+#### Rules
+- NEVER modify files directly in the main working directory
+- Each task gets its own worktree with a descriptive branch name
+- Run `make generate` if API structs are modified
+- Run `make lint && make test` before committing
 
 <!-- MANUAL: Any manually added notes below this line are preserved on regeneration -->
