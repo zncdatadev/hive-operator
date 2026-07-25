@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"path"
 	"strconv"
@@ -120,7 +121,11 @@ func (s *S3Config) GetVolumes() []corev1.Volume {
 		if credential.Scope.Pod {
 			scopes = append(scopes, string(constants.PodScope))
 		}
-		scopes = append(scopes, credential.Scope.Services...)
+		// The secret-operator scope parser only recognizes service entries in the
+		// form "service=<name>"; bare names are skipped with "Unknown scope".
+		for _, svc := range credential.Scope.Services {
+			scopes = append(scopes, fmt.Sprintf("%s=%s", constants.ServiceScope, svc))
+		}
 
 		annotations[constants.AnnotationSecretsScope] = strings.Join(scopes, constants.CommonDelimiter)
 	}
