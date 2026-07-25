@@ -135,7 +135,9 @@ func (b *StatefulSetBuilder) getMainContainer(krb5Config *KerberosConfig, s3Conf
 		b.RoleName,
 		b.GetImage(),
 	)
-	container.SetCommand([]string{"sh", "-x", "-euo", "pipefail", "-c"}).
+	// Do not use `-x` here: the script exports S3 credentials read from files,
+	// and xtrace would echo the expanded secret values into the container log.
+	container.SetCommand([]string{"sh", "-euo", "pipefail", "-c"}).
 		SetArgs(b.getMainContainerCommandArgs(krb5Config, s3Config)).
 		AddEnvVars(b.getMainContainerEnv(krb5Config)).
 		AddEnvFromSecret(b.ClusterConfig.Database.CredentialsSecret).
