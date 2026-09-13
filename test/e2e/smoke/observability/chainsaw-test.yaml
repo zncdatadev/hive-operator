@@ -107,7 +107,10 @@ spec:
             fi
 
             helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
-            helm repo update
+            # Update only the repo this test needs. A bare `helm repo update` refreshes every
+            # repo configured on the machine and fails the whole step if any unrelated one is
+            # unreachable, which has nothing to do with what is under test.
+            helm repo update prometheus-community
 
             echo "=== Installing Prometheus ==="
             echo "Will install to namespace: $NAMESPACE"
@@ -118,6 +121,23 @@ spec:
               --create-namespace \
               -f prometheus-values.yaml \
               --wait --timeout 5m
+    # Runs at test teardown, before chainsaw drops the namespace. The chart owns cluster-scoped
+    # objects (the prometheus-server ClusterRole and ClusterRoleBinding) that deleting the
+    # namespace leaves behind, and since every run gets a fresh random namespace those leftovers
+    # make the NEXT run fail with "invalid ownership metadata ... release-namespace must equal
+    # <new ns>". Uninstalling here is what keeps this test re-runnable.
+    cleanup:
+      - script:
+          bindings:
+            - name: NAMESPACE
+              value: ($namespace)
+          content: |
+            #!/bin/bash
+            helm uninstall prometheus --namespace "$NAMESPACE" --wait --timeout 2m 2>/dev/null || true
+            # Also reclaim the cluster-scoped objects directly, in case the release record is
+            # already gone (e.g. a previous run was interrupted after its namespace went away).
+            kubectl delete clusterrole prometheus-server --ignore-not-found=true
+            kubectl delete clusterrolebinding prometheus-server --ignore-not-found=true
 
   # 4. Verify Prometheus targets
   - name: verify prometheus targets

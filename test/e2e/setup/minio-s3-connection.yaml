@@ -15,6 +15,9 @@ metadata:
 spec:
   host: minio
   port: 9000
+  # MinIO only serves path-style requests: virtual-host addressing would resolve the bucket as
+  # "hive.minio", which does not exist in cluster DNS.
+  pathStyle: true
   credentials:
     secretClass: hive-s3-credentials
 ---

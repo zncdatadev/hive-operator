@@ -19,12 +19,16 @@ package v1alpha1
 import (
 	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
 	s3v1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
-	"github.com/zncdatadev/operator-go/pkg/constants"
+	"github.com/zncdatadev/operator-go/pkg/common"
+	"github.com/zncdatadev/operator-go/pkg/listener"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
 	DefaultWarehouseDir = "/kubedoop/warehouse"
+
+	RoleMetastore = "metastore"
 )
 
 // +kubebuilder:object:root=true
@@ -78,7 +82,7 @@ type ClusterConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=cluster-internal
 	// +kubebuilder:validation:Enum=cluster-internal;external-unstable;external-stable
-	ListenerClass constants.ListenerClass `json:"listenerClass,omitempty"`
+	ListenerClass listener.ListenerClass `json:"listenerClass,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	HDFS *HDFSSpec `json:"hdfs,omitempty"`
@@ -160,8 +164,15 @@ type RoleSpec struct {
 type ConfigSpec struct {
 	*commonsv1alpha1.RoleGroupConfigSpec `json:",inline"`
 
+	// WarehouseDir is the metastore's warehouse location. Defaults to DefaultWarehouseDir when
+	// unset at both the role group and the role level.
+	//
+	// Deliberately carries no +kubebuilder:default: structural defaulting fills a leaf as soon
+	// as its enclosing object exists, so a CRD default here would be stamped into every role
+	// group that declares `config` for any reason at all (to set resources, say), making a
+	// role-level value impossible to inherit. The default is applied at consumption time
+	// instead — see resolveWarehouseDir.
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="/kubedoop/warehouse"
 	WarehouseDir string `json:"warehouseDir,omitempty"`
 }
 
@@ -178,13 +189,129 @@ type RoleGroupSpec struct {
 
 // HiveMetastoreStatus defines the observed state of HiveMetastore
 type HiveMetastoreStatus struct {
-	// +kubebuilder:validation:Optional
-	Conditions []metav1.Condition `json:"condition,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Replicas int32 `json:"replicas,omitempty"`
+	commonsv1alpha1.GenericClusterStatus `json:",inline"`
 }
+
+// ClusterInterface implementation
+
+// GetSpec adapts the product spec to the framework's generic cluster spec.
+func (h *HiveMetastore) GetSpec() *commonsv1alpha1.GenericClusterSpec {
+	return h.Spec.ToGenericSpec()
+}
+
+// GetStatus returns the cluster status.
+func (h *HiveMetastore) GetStatus() *commonsv1alpha1.GenericClusterStatus {
+	return &h.Status.GenericClusterStatus
+}
+
+// SetStatus updates the cluster status.
+func (h *HiveMetastore) SetStatus(status *commonsv1alpha1.GenericClusterStatus) {
+	h.Status.GenericClusterStatus = *status
+}
+
+// GetObjectMeta returns the object metadata.
+func (h *HiveMetastore) GetObjectMeta() *metav1.ObjectMeta {
+	return &h.ObjectMeta
+}
+
+// GetScheme returns the cached runtime scheme.
+func (h *HiveMetastore) GetScheme() *runtime.Scheme {
+	return cachedScheme
+}
+
+// DeepCopyCluster creates a deep copy of the cluster.
+func (h *HiveMetastore) DeepCopyCluster() common.ClusterInterface {
+	return h.DeepCopy()
+}
+
+// GetRuntimeObject returns the underlying runtime.Object.
+func (h *HiveMetastore) GetRuntimeObject() runtime.Object {
+	return h
+}
+
+// VectorAggregatorConfigMapName implements reconciler.VectorAggregatorProvider so the framework
+// owns vector.yaml generation: when a role group enables the Vector agent, the GenericReconciler
+// resolves the aggregator address from this ConfigMap and renders vector.yaml into the role group
+// ConfigMap. Returns "" when unset (the framework then omits vector.yaml).
+func (h *HiveMetastore) VectorAggregatorConfigMapName() string {
+	if h.Spec.ClusterConfig == nil {
+		return ""
+	}
+	return h.Spec.ClusterConfig.VectorAggregatorConfigMapName
+}
+
+// ToGenericSpec adapts HiveMetastoreSpec to GenericClusterSpec.
+func (s *HiveMetastoreSpec) ToGenericSpec() *commonsv1alpha1.GenericClusterSpec {
+	result := &commonsv1alpha1.GenericClusterSpec{
+		ClusterOperation: s.ClusterOperation,
+	}
+
+	if s.Image != nil {
+		result.Image = &commonsv1alpha1.ImageSpec{
+			Custom:          s.Image.Custom,
+			Repo:            s.Image.Repo,
+			ProductVersion:  s.Image.ProductVersion,
+			KubedoopVersion: s.Image.KubedoopVersion,
+			PullPolicy:      s.Image.PullPolicy,
+			// The CRD has always accepted pullSecretName; the framework now renders it onto the
+			// pod's imagePullSecrets, so it must survive this adapter or a private-registry
+			// install fails with ImagePullBackOff and nothing naming the cause.
+			PullSecretName: s.Image.PullSecretName,
+		}
+	}
+
+	if s.Metastore != nil {
+		roleSpec := commonsv1alpha1.RoleSpec{
+			RoleConfig: s.Metastore.RoleConfig,
+		}
+
+		if s.Metastore.Config != nil {
+			roleSpec.Config = s.Metastore.Config.RoleGroupConfigSpec
+		}
+
+		if s.Metastore.OverridesSpec != nil {
+			roleSpec.ConfigOverrides = s.Metastore.ConfigOverrides
+			roleSpec.EnvOverrides = s.Metastore.EnvOverrides
+			roleSpec.CliOverrides = s.Metastore.CliOverrides
+			roleSpec.PodOverrides = s.Metastore.PodOverrides
+		}
+
+		roleGroups := make(map[string]commonsv1alpha1.RoleGroupSpec)
+		for name, rg := range s.Metastore.RoleGroups {
+			if rg == nil {
+				continue
+			}
+			adapted := commonsv1alpha1.RoleGroupSpec{}
+			if rg.Replicas > 0 {
+				replicas := rg.Replicas
+				adapted.Replicas = &replicas
+			}
+			if rg.Config != nil {
+				adapted.Config = rg.Config.RoleGroupConfigSpec
+			}
+			if rg.OverridesSpec != nil {
+				adapted.ConfigOverrides = rg.ConfigOverrides
+				adapted.EnvOverrides = rg.EnvOverrides
+				adapted.CliOverrides = rg.CliOverrides
+				adapted.PodOverrides = rg.PodOverrides
+			}
+			roleGroups[name] = adapted
+		}
+		roleSpec.RoleGroups = roleGroups
+
+		result.Roles = map[string]commonsv1alpha1.RoleSpec{
+			RoleMetastore: roleSpec,
+		}
+	}
+
+	return result
+}
+
+// cachedScheme is initialized once and reused across all reconcile calls.
+var cachedScheme *runtime.Scheme
 
 func init() {
 	SchemeBuilder.Register(&HiveMetastore{}, &HiveMetastoreList{})
+	cachedScheme = runtime.NewScheme()
+	_ = SchemeBuilder.AddToScheme(cachedScheme)
 }

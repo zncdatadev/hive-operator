@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	hivev1alpha1 "github.com/zncdatadev/hive-operator/api/v1alpha1"
+	"github.com/zncdatadev/hive-operator/internal/util/version"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -55,6 +56,12 @@ func TestControllers(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+
+	// Stand in for the -ldflags the Makefile and Dockerfile always inject. The build version
+	// becomes the image tag's "-kubedoop" suffix, and the framework rejects the "N/A" placeholder
+	// as an illegal tag, so without this every image resolution in the suite would fail on a
+	// condition that cannot occur in a real build.
+	version.BuildVersion = "0.0.0-test"
 
 	ctx, cancel = context.WithCancel(context.TODO())
 

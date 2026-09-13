@@ -39,7 +39,7 @@ spec:
           #!/bin/bash
           # Get logs from vector-aggregator-0 and check for specific log pattern
           kubectl -n $NAMESPACE logs statefulset/vector-aggregator -c vector | \
-            grep -q 'cluster":"test-hive","container":"metastore","errors":\[\],"file":"hive.log4j2.xml"'
+            grep -q 'cluster":"test-hive","container":"metastore","errors":\[\],"file":"metastore.log4j2.xml"'
           exit_code=$?
 
           if [ $exit_code -eq 0 ]; then

@@ -47,9 +47,7 @@ cover.out
 # helm charts
 # helm package directory
 target
-
-# AI worktree
-.worktree/
+vendor/
 
 # AI worktree
 .worktree/

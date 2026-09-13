@@ -1,15 +1,18 @@
 ---
-apiVersion: zookeeper.kubedoop.dev/v1alpha1
-kind: ZookeeperCluster
+apiVersion: hive.kubedoop.dev/v1alpha1
+kind: HiveMetastore
 metadata:
-  name: test-zk
+  name: test-hive
 spec:
   image:
     productVersion: ($values.product_version)
   clusterConfig:
-    listenerClass: cluster-internal
-  server:
+    database:
+      databaseType: derby
+      connString: jdbc:derby:;databaseName=metastore_db;create=true
+      credentialsSecret: hive-credentials
+  metastore:
     roleGroups:
       primary:
         replicas: 1
-      # secondary:
+      # secondary is removed: the operator must reclaim its resources.

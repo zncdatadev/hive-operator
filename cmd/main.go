@@ -39,6 +39,7 @@ import (
 	"github.com/zncdatadev/hive-operator/internal/controller"
 	"github.com/zncdatadev/hive-operator/internal/util/version"
 	s3v1alph1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
+	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	// +kubebuilder:scaffold:imports
 )
@@ -93,7 +94,7 @@ func main() {
 	flag.Parse()
 
 	if showVersion {
-		importedVersion := version.NewAppInfo("zookeeper-operator").String()
+		importedVersion := version.NewAppInfo("hive-operator").String()
 		fmt.Println(importedVersion)
 		os.Exit(0)
 	}
@@ -191,10 +192,40 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.HiveMetastoreReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	hiveHandler := controller.NewHiveRoleGroupHandler(mgr.GetScheme())
+	hiveReconciler, err := reconciler.NewGenericReconciler(
+		&reconciler.GenericReconcilerConfig[*hivev1alpha1.HiveMetastore]{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+			// operator-go's Recorder field is the (deprecated) record.EventRecorder; the
+			// replacement GetEventRecorder returns the incompatible events.EventRecorder.
+			Recorder:         mgr.GetEventRecorderFor("hive-metastore-controller"), //nolint:staticcheck
+			RoleGroupHandler: hiveHandler,
+			// Everything the metastore role is made of — container name, ports, entrypoint,
+			// probes, log producers, env — is declared once per pass with the CR in hand.
+			RoleProvider: hiveHandler,
+			// The listener class and the database credentials envFrom follow from the CR, and are
+			// contributed after the config fold so a user's podOverrides still have the last word.
+			RoleGroupResolver: hiveHandler,
+			// Read every reconcile, so an operator upgrade moves existing clusters onto the
+			// co-released product image. A mutating webhook cannot do this: its defaults are
+			// persisted at admission and never recomputed, freezing kubedoopVersion at whatever
+			// version first admitted the CR. Kubedoop publishes Hive images only with the
+			// "-kubedoop<version>" suffix, so that field must always resolve to something.
+			ImageResolution: reconciler.ImageResolution{
+				ProductName: hivev1alpha1.DefaultProductName,
+				Defaults:    controller.ImageDefaults(),
+			},
+			// The workload ServiceAccount is derived and owned by the framework
+			// ("hivemetastore-<cluster>"); WorkloadRBACRules is left unset because metastore
+			// pods make no Kubernetes API calls of their own.
+			Prototype: &hivev1alpha1.HiveMetastore{},
+		})
+	if err != nil {
+		setupLog.Error(err, "unable to create reconciler", "controller", "HiveMetastore")
+		os.Exit(1)
+	}
+	if err = hiveReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HiveMetastore")
 		os.Exit(1)
 	}

@@ -28,7 +28,8 @@ spec:
       inline:
         host: test-minio
         port: 9000
-        accessStyle: Path
+        # MinIO requires path-style addressing.
+        pathStyle: true
         credentials:
           secretClass: simple-hive-s3-secret-class
   metastore:

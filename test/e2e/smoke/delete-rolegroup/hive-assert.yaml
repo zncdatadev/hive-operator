@@ -1,27 +1,39 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: test-hive-server-primary
+  name: test-hive-metastore-primary
 spec:
   template:
     spec:
       containers:
-        - name: server
+        - name: metastore
 status:
   availableReplicas: ($available_replicas)
-  replicas: 1
   currentReplicas: ($available_replicas)
+  replicas: 1
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: test-hive-server-secondary
+  name: test-hive-metastore-secondary
 spec:
   template:
     spec:
       containers:
-        - name: server
+        - name: metastore
 status:
   availableReplicas: ($available_replicas)
-  replicas: 1
   currentReplicas: ($available_replicas)
+  replicas: 1
+---
+# The role group's companion resources exist before the group is removed, so their absence
+# afterwards is a real reclaim rather than a resource that was never created.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-hive-metastore-secondary
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-hive-metastore-secondary

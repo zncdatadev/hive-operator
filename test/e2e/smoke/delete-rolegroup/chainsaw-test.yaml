@@ -3,23 +3,30 @@ kind: Test
 metadata:
   name: smoke-delete-rolegroup
 spec:
-  skip: true # skip this test, it is not ready yet, roleGroup reconciler logic is not implemented,  ref https://github.com/zncdatadev/trino-operator/issues/204
   bindings:
     - name: available_replicas
       value: 1
   steps:
   - name: delete rolegroup
+    description: >-
+      Removing a role group from the CR must reclaim the whole group — StatefulSet, ConfigMap
+      and Service — via the framework's orphan cleanup.
     try:
-    # install hive
+    # install hive with two role groups
     - apply:
         file: hive.yaml
     - assert:
         file: hive-assert.yaml
-    # delete rolegroup
-    - apply:
+    # Remove the "secondary" role group. This must be `update`, not `apply`: chainsaw patches an
+    # existing object with a merge patch, which merges map keys but never removes one, so
+    # `apply` would leave `secondary` in the spec and the operator would rightly keep it.
+    - update:
         file: hive-delete-rolegroup.yaml
     - assert:
-        bindings:
         file: hive-delete-rolegroup-assert.yaml
+    # The orphan is drained before deletion (scale to 0, then wait out
+    # terminationGracePeriodSeconds), so reclaiming it takes ~35s — well past the suite's
+    # default error timeout.
     - error:
+        timeout: 90s
         file: hive-delete-rolegroup-error.yaml

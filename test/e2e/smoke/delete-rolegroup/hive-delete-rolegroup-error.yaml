@@ -1,4 +1,15 @@
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: test-zk-server-secondary
+  name: test-hive-metastore-secondary
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-hive-metastore-secondary
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-hive-metastore-secondary
